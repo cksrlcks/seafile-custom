@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, User } from "lucide-react";
-import { useState } from "react";
+import { LogOut, RefreshCw, Upload, User } from "lucide-react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/storage/StorageContext";
-import type { Entry } from "@/storage/StorageProvider";
+import type { Entry, UploadTask } from "@/storage/StorageProvider";
+import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
 import { Breadcrumb } from "./Breadcrumb";
 import { FileTable, FileTableSkeleton } from "./FileTable";
 import { Sidebar } from "./Sidebar";
@@ -17,6 +18,12 @@ export function MainScreen() {
   const libs = useLibraries();
   const dir = useCurrentDir(loc);
   const libName = libs.data?.find((l) => l.id === loc.libId)?.name;
+  const dropRef = useRef<DropZoneHandle>(null);
+
+  function onFiles(tasks: UploadTask[]) {
+    // Task 8에서 업로드 큐로 연결
+    console.log("drop", tasks);
+  }
 
   function openFile(entry: Entry) {
     // Task 9/10에서 미리보기·다운로드로 연결
@@ -31,6 +38,11 @@ export function MainScreen() {
         <div className="min-w-0 flex-1">
           {loc.libId && <Breadcrumb libName={libName} path={loc.path} onNavigate={(path) => setLoc({ ...loc, path })} />}
         </div>
+        {loc.libId && (
+          <Button variant="outline" size="sm" onClick={() => dropRef.current?.open()}>
+            <Upload className="size-4" /> 업로드
+          </Button>
+        )}
         <Button variant="ghost" size="icon-sm" title="새로고침" onClick={() => qc.invalidateQueries({ queryKey: ["dir"] })}>
           <RefreshCw className="size-4" />
         </Button>
@@ -50,6 +62,7 @@ export function MainScreen() {
       <div className="flex min-h-0 flex-1">
         <Sidebar libraries={libs.data} selected={loc.libId} onSelect={(libId) => setLoc({ libId, path: "/" })} />
         <main className="relative flex min-w-0 flex-1 flex-col overflow-auto">
+          <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
           {libs.error && <ErrorBanner message="라이브러리 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
           {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
           {loc.libId === null ? (
@@ -61,6 +74,7 @@ export function MainScreen() {
           ) : dir.data ? (
             <FileTable entries={dir.data} onOpenDir={(path) => setLoc({ ...loc, path })} onOpenFile={openFile} />
           ) : null}
+          </DropZone>
         </main>
       </div>
     </div>
