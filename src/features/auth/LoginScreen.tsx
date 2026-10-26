@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Logo } from "@/components/ui/logo";
 import { useSession } from "@/storage/StorageContext";
 import { loginErrorMessage } from "./loginError";
 
@@ -34,7 +33,7 @@ export function LoginScreen() {
   return (
     <div className="flex h-screen items-center justify-center bg-linear-to-b from-sidebar to-sidebar-bottom">
       <form onSubmit={submit} className="flex w-88 flex-col gap-2 rounded-2xl border border-border bg-card p-8 shadow-float">
-        <div className="mb-4 flex items-center gap-2.5"><Logo /><h1 className="text-lg font-semibold tracking-tight">seadrive</h1></div>
+        <h1 className="mb-4 text-xl font-semibold tracking-tight">Drive</h1>
         <label className="text-xs text-muted-foreground">서버 주소</label>
         <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." required />
         <label className="text-xs text-muted-foreground">아이디</label>

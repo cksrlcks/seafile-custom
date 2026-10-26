@@ -6,7 +6,6 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } 
 import { InlineName } from "./InlineName";
 import { StorageCard } from "./StorageCard";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/logo";
 import type { Library } from "@/storage/StorageProvider";
 import { useCurrentDir, type Location } from "./useCurrentDir";
 
@@ -25,8 +24,7 @@ export function Sidebar({ libraries, loc, onNavigate, onCollapse, onRenameLibrar
   return (
     <aside className="flex w-80 shrink-0 flex-col gap-7 overflow-y-auto bg-linear-to-b from-sidebar to-sidebar-bottom px-6 pt-9 pb-6">
       <div className="flex h-8 items-center gap-2.5 px-1">
-        <Logo />
-        <span className="text-lg font-semibold tracking-tight">seadrive</span>
+        <span className="text-xl font-semibold tracking-tight">Drive</span>
         <div className="flex-1" />
         <Button variant="ghost" size="icon-sm" onClick={onCollapse} title="사이드바 접기" className="text-muted-foreground hover:bg-sidebar-accent">
           <PanelLeft className="size-4.5" />
