@@ -33,6 +33,12 @@ describe("SeafileApi", () => {
     expect(err.kind).toBe("unauthorized");
   });
 
+  it("treats a redirect after a successful write as success (does not follow it)", async () => {
+    fetchMock.mockResolvedValue({ type: "opaqueredirect", ok: false, status: 0, headers: new Headers(), text: async () => "" } as unknown as Response);
+    await expect(api().postForm("/api2/repos/r/file/", { operation: "rename", newname: "b" }, { p: "/a" })).resolves.toBeUndefined();
+    expect((fetchMock.mock.calls[0][1] as RequestInit).redirect).toBe("manual");
+  });
+
   it("maps fetch failure to network", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     const err = (await api().get("/api2/repos/").catch((e) => e)) as StorageError;

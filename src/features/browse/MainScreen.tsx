@@ -13,7 +13,7 @@ import { planUploads } from "@/features/upload/planUploads";
 import { UploadPanel } from "@/features/upload/UploadPanel";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
-import { parentPath, splitPath } from "@/storage/path";
+import { joinPath, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
@@ -22,6 +22,7 @@ import { IconGrid } from "./IconGrid";
 import { Sidebar } from "./Sidebar";
 import { useCurrentDir, useLibraries, type Location } from "./useCurrentDir";
 import { useEntryActions } from "./useEntryActions";
+import { useRecursiveSearch } from "@/features/search/useRecursiveSearch";
 
 export function MainScreen() {
   const { session, logout } = useSession();
@@ -71,11 +72,10 @@ export function MainScreen() {
   const [view, setView] = useState<ViewMode>("list");
   const [sort, setSort] = useState<Sort>({ key: "name", dir: "asc" });
   const [filter, setFilter] = useState("");
-  const entries = useMemo(() => {
-    const list = dir.data ?? [];
-    const f = filter.trim().toLowerCase();
-    return orderEntries(f ? list.filter((e) => e.name.toLowerCase().includes(f)) : list, sort);
-  }, [dir.data, filter, sort]);
+  // 검색어가 있으면 현재 폴더와 하위 폴더 전체에서 이름으로 찾는다
+  const search = useRecursiveSearch(loc.libId, loc.path, filter);
+  const searching = filter.trim() !== "";
+  const entries = useMemo(() => orderEntries(searching ? search.results : (dir.data ?? []), sort), [searching, search.results, dir.data, sort]);
   const onSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
   // ---- 선택 (클릭 / Ctrl / Shift / 키보드) ----
@@ -128,6 +128,10 @@ export function MainScreen() {
   const renameLibrary = useMutation({
     mutationFn: ({ lib, newName }: { lib: Library; newName: string }) => storage.renameLibrary(lib.id, newName),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["libraries"] }),
+  });
+  const renameFolder = useMutation({
+    mutationFn: ({ libId, path, newName }: { libId: string; path: string; newName: string }) => storage.rename(libId, path, newName, "dir"),
+    onSuccess: (_d, { libId, path }) => qc.invalidateQueries({ queryKey: ["dir", libId, parentPath(path)] }),
   });
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -185,6 +189,7 @@ export function MainScreen() {
     entries,
     sort,
     onSort,
+    locationRoot: searching ? loc.path : null,
     selected,
     focusPath,
     onSelect: select,
@@ -243,11 +248,29 @@ export function MainScreen() {
       />
 
       <div className="flex min-h-0 flex-1">
-        {sidebarOpen && <Sidebar libraries={libs.data} loc={loc} onNavigate={setLoc} onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })} />}
+        {sidebarOpen && (
+          <Sidebar
+            libraries={libs.data}
+            loc={loc}
+            onNavigate={setLoc}
+            onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
+            onRenameFolder={(libId, path, newName) =>
+              renameFolder.mutate({ libId, path, newName }, {
+                onSuccess: () => {
+                  // 보고 있던 위치가 이름 바뀐 폴더 안이면 새 경로로 옮긴다
+                  if (loc.libId === libId && (loc.path === path || loc.path.startsWith(path + "/"))) {
+                    setLoc({ libId, path: joinPath(parentPath(path), newName) + loc.path.slice(path.length) });
+                  }
+                },
+              })
+            }
+          />
+        )}
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {libs.error && <ErrorBanner message="저장소 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
           {renameLibrary.error && <ErrorBanner message={`저장소 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
+          {renameFolder.error && <ErrorBanner message={`폴더 이름을 바꾸지 못했습니다 (${(renameFolder.error as Error).message})`} actionLabel="닫기" onRetry={() => renameFolder.reset()} />}
           {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
           {ops.error && <ErrorBanner message={`${ops.error.message} (${ops.error.detail})`} actionLabel="닫기" onRetry={ops.error.reset} />}
 
@@ -261,10 +284,10 @@ export function MainScreen() {
             >
               {loc.libId === null ? (
                 <Empty text="왼쪽에서 저장소를 선택하세요" />
-              ) : dir.isLoading ? (
+              ) : dir.isLoading && !searching ? (
                 <FileListSkeleton />
               ) : entries.length === 0 && !creatingFolder ? (
-                <Empty text={filter ? "일치하는 항목이 없습니다" : "비어 있는 폴더입니다. 파일을 끌어다 놓으세요"} />
+                <Empty text={searching ? (search.done ? `'${filter.trim()}'와 일치하는 항목이 없습니다` : "검색 중…") : "비어 있는 폴더입니다. 파일을 끌어다 놓으세요"} />
               ) : view === "grid" ? (
                 <IconGrid {...listProps} />
               ) : (
@@ -276,7 +299,12 @@ export function MainScreen() {
         </main>
       </div>
 
-      <StatusBar itemCount={dir.data ? dir.data.length : null} selectedCount={selectedEntries.length} selectedBytes={selectedEntries.reduce((a, e) => a + e.size, 0)} />
+      <StatusBar
+        itemCount={searching ? null : dir.data ? dir.data.length : null}
+        note={searching ? `검색 결과 ${search.results.length}개 · 폴더 ${search.scanned}개 확인${search.done ? "" : " 중…"}${search.truncated ? " (폴더가 많아 일부만 검색)" : ""}` : undefined}
+        selectedCount={selectedEntries.length}
+        selectedBytes={selectedEntries.reduce((a, e) => a + e.size, 0)}
+      />
 
       {loc.libId && (
         <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={() => setPreviewPath(null)} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate(e)} />

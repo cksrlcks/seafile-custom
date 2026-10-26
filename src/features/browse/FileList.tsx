@@ -32,6 +32,13 @@ const ICONS: Record<string, typeof IconFile> = {
   js: IconCode, ts: IconCode, tsx: IconCode, jsx: IconCode, py: IconCode, rs: IconCode, go: IconCode, json: IconCode, html: IconCode, css: IconCode, sh: IconCode,
 };
 
+/** 검색 결과의 위치: 기준 폴더 아래 상대 경로 ("· 문서/2025"), 기준 폴더 바로 아래면 "· 이 폴더" */
+export function locationLabel(root: string, path: string): string {
+  const parent = path.slice(0, path.lastIndexOf("/")) || "/";
+  const rel = parent === root ? "" : parent.slice(root === "/" ? 1 : root.length + 1);
+  return rel ? `· ${rel}` : "· 이 폴더";
+}
+
 export function EntryIcon({ entry, className }: { entry: Entry; className?: string }) {
   if (entry.type === "dir") return <IconFolder className={cn("size-4 fill-primary/20 text-primary", className)} />;
   const ext = entry.name.split(".").pop()?.toLowerCase() ?? "";
@@ -41,6 +48,8 @@ export function EntryIcon({ entry, className }: { entry: Entry; className?: stri
 
 export interface ListProps {
   entries: Entry[];
+  /** 검색 결과일 때 기준 폴더. 각 항목의 상위 위치를 이 기준으로 보여 준다 */
+  locationRoot?: string | null;
   sort: Sort;
   onSort(key: SortKey): void;
   selected: Set<string>;
@@ -112,10 +121,13 @@ export function FileList(p: ListProps) {
                   ) : (
                     <span className="truncate">{e.name}</span>
                   )}
+                  {p.locationRoot != null && p.renamingPath !== e.path && (
+                    <span className="truncate text-2xs text-muted-foreground">{locationLabel(p.locationRoot, e.path)}</span>
+                  )}
                 </span>
               </td>
-              <td className="pl-3 text-muted-foreground">{formatDateLong(e.mtime)}</td>
-              <td className="pr-3 pl-3 text-right text-muted-foreground tabular-nums">{e.type === "file" ? formatSize(e.size) : ""}</td>
+              <td className="truncate pl-3 text-muted-foreground">{formatDateLong(e.mtime)}</td>
+              <td className="truncate pr-3 pl-3 text-right text-muted-foreground tabular-nums">{e.type === "file" ? formatSize(e.size) : ""}</td>
             </EntryContextMenu>
           );
         })}
@@ -128,8 +140,8 @@ export function FileList(p: ListProps) {
 function Th({ label, k, sort, onSort, className, resize, onResize }: { label: string; k: SortKey; sort: Sort; onSort(k: SortKey): void; className?: string; resize?: ColKey; onResize?(key: ColKey, e: React.PointerEvent): void }) {
   const active = sort.key === k;
   return (
-    <th className={cn("relative cursor-default text-left font-normal select-none hover:bg-accent", className)} onClick={() => onSort(k)}>
-      <span className="inline-flex items-center gap-1">
+    <th className={cn("relative cursor-default overflow-hidden text-left font-normal whitespace-nowrap select-none hover:bg-accent", className)} onClick={() => onSort(k)}>
+      <span className="inline-flex max-w-full items-center gap-1 truncate">
         {label}
         {active && (sort.dir === "asc" ? <IconArrowUp className="size-3" /> : <IconArrowDown className="size-3" />)}
       </span>

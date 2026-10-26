@@ -70,9 +70,9 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
           })}
         </div>
 
-        <div className="relative mx-1 w-44 shrink-0">
+        <div className="relative mx-1 w-52 shrink-0">
           <IconSearch className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" stroke={1.75} />
-          <Input value={filter} onChange={(e) => onFilter(e.target.value)} placeholder="현재 폴더 검색" disabled={disabled} className="h-7 rounded-md pl-7 text-sm md:text-sm" />
+          <Input value={filter} onChange={(e) => onFilter(e.target.value)} onKeyDown={(e) => e.key === "Escape" && onFilter("")} placeholder="이 폴더와 하위 폴더 검색" disabled={disabled} className="h-7 rounded-md pl-7 text-sm md:text-sm" />
         </div>
 
         <div className="mx-1 flex h-7 shrink-0 items-center rounded-md border border-border bg-background p-0.5">

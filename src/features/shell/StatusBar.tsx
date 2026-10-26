@@ -5,18 +5,20 @@ import { useStorage } from "@/storage/StorageContext";
 
 interface Props {
   itemCount: number | null;
+  /** 검색 중 등 항목 수 대신 보여 줄 문구 */
+  note?: string;
   selectedCount: number;
   selectedBytes: number;
 }
 
 /** Finder/탐색기식 하단 상태 표시줄 24px */
-export function StatusBar({ itemCount, selectedCount, selectedBytes }: Props) {
+export function StatusBar({ itemCount, note, selectedCount, selectedBytes }: Props) {
   const storage = useStorage();
   const acc = useQuery({ queryKey: ["account"], queryFn: () => storage.getAccount(), staleTime: 30_000 });
   const a = acc.data;
   return (
     <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-sidebar px-3 text-2xs text-muted-foreground">
-      <span>{itemCount === null ? "" : `${itemCount}개 항목`}</span>
+      <span className="truncate">{note ?? (itemCount === null ? "" : `${itemCount}개 항목`)}</span>
       {selectedCount > 0 && (
         <span className="text-foreground">
           {selectedCount}개 선택{selectedBytes > 0 && ` · ${formatSize(selectedBytes)}`}
@@ -27,7 +29,7 @@ export function StatusBar({ itemCount, selectedCount, selectedBytes }: Props) {
         <span className="flex items-center gap-2">
           {a.quota ? (
             <>
-              <Progress value={Math.min(100, (a.usage / a.quota) * 100)} className="w-24" />
+              <Progress value={Math.max(1.5, Math.min(100, (a.usage / a.quota) * 100))} className="w-24 [&_[data-slot=progress-track]]:h-1.5 [&_[data-slot=progress-track]]:bg-foreground/15" />
               <span>
                 {formatSize(a.usage)} / {formatSize(a.quota)} 사용
               </span>

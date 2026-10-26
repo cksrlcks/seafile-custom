@@ -33,11 +33,13 @@ export class SeafileApi {
 
     let res: Response;
     try {
-      res = await fetch(this.url(path, query), { method, headers, body, signal });
+      // Seahub api2는 이름 변경 등 성공 시 301로 응답한다. 따라가면 CORS로 실패하므로 따라가지 않는다.
+      res = await fetch(this.url(path, query), { method, headers, body, signal, redirect: "manual" });
     } catch (e) {
       if ((e as Error).name === "AbortError") throw e;
       throw new StorageError("network", (e as Error).message);
     }
+    if (res.type === "opaqueredirect") return undefined as T;
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       const kind = res.status === 401 ? "unauthorized" : res.status === 404 ? "notFound" : "server";
