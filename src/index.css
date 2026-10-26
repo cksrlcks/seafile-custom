@@ -22,6 +22,10 @@
     --shadow-float: 0 12px 32px -8px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.04);
     --shadow-item: 0 1px 2px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04);
     --color-sidebar-bottom: var(--sidebar-bottom);
+    --color-brand-a: var(--brand-a);
+    --color-brand-b: var(--brand-b);
+    /* 로그인 엠블럼(pill): 상단 광택 + 브랜드색 그림자 */
+    --shadow-pill: inset 0 1px 0 rgb(255 255 255 / 0.5), inset 0 -1px 0 rgb(0 0 0 / 0.08), 0 10px 24px -10px var(--brand-b);
     --color-surface-header: var(--surface-header);
     --font-heading: var(--font-sans);
     --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, "SF Pro Text", system-ui, "Pretendard Variable", sans-serif;
@@ -168,4 +172,16 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer base {
+  body {
+    letter-spacing: -0.01em;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+  input, textarea {
+    letter-spacing: -0.005em;
+  }
 }

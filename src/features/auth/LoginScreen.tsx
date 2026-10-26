@@ -52,11 +52,11 @@ export function LoginScreen() {
       <div className="flex min-h-0 flex-1 items-center justify-center pb-9">
       <form onSubmit={submit} className="flex w-88 flex-col gap-4 rounded-xl border border-border bg-card p-8 text-sm shadow-float">
         <div className="flex flex-col items-center gap-2 pb-2">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <IconCloud className="size-7" stroke={1.75} />
+          <div className="flex h-10 w-16 items-center justify-center rounded-full bg-linear-to-br from-brand-a to-brand-b text-primary-foreground shadow-pill">
+            <IconCloud className="size-6" stroke={2} />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Drive</h1>
-          <p className="text-xs text-muted-foreground">내 서버의 파일을 열고 올립니다</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">Drive</h1>
+          <p className="text-xs tracking-normal text-muted-foreground">저장소에 연결하려면 로그인하세요</p>
         </div>
 
         <label className="flex flex-col gap-1.5">
