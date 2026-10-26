@@ -158,6 +158,14 @@ export function createProvider(conn: Connection): StorageProvider  // kind별 sw
 - **다크 모드 대비.** 토큰이 `.dark` 선택자에서 재정의되는 shadcn 구조를 유지한다. v1에서 토글은 안 만들지만 클래스 하나로 켤 수 있어야 한다.
 - 위 규칙을 `docs/DESIGN.md` 한 장에 적고, 빌드 단계의 검사 스크립트가 `src/features` 안의 원시 값 사용을 잡는다.
 
+**비주얼 방향 (사용자가 준 참고 시안 2장 기준, 2026-10-26 추가)**
+- 연한 회색 캔버스(`--background`) 위에 흰색 둥근 패널(`--card`, `rounded-2xl`, 얇은 `--border`, `shadow-sm`). 창 가장자리 여백 `p-3`.
+- 사이드바는 캔버스 색 그대로(패널 아님). 선택 항목만 흰색 배경 + 그림자.
+- 무채색 중심, 포인트는 파란색 하나(`--primary`). 반경 기본 14px(`--radius: 0.875rem`).
+- 메인 패널 안: 브레드크럼 줄 → 제목 줄(현재 폴더명 + 동작 버튼) → **폴더 카드 묶음**(현재 폴더의 하위 폴더, 광택 있는 파란 폴더 일러스트 + 이름) → **파일 테이블**(파일만, 행 `h-10`, 옅은 행 구분선).
+- 폴더 일러스트는 `components/ui/folder-glyph.tsx` 하나(그라데이션은 `--folder-top/--folder-bottom` 토큰).
+- 참고 시안에 있지만 v1에서 빼는 것: 그리드/목록 토글, 검색, 체크박스 다중 선택, 저장 용량 바, 태그.
+
 ### 4.4 Seafile 구현체가 쓰는 API (SeafileProvider 내부에서만)
 
 | 메서드 | 호출 |

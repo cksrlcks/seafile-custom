@@ -11,8 +11,8 @@ interface Props {
 
 export function Sidebar({ libraries, selected, onSelect }: Props) {
   return (
-    <aside className="flex w-56 shrink-0 flex-col gap-2 border-r border-border bg-muted/40 p-4">
-      <div className="text-xs font-medium text-muted-foreground">라이브러리</div>
+    <aside className="flex w-56 shrink-0 flex-col gap-2 py-2 pr-3">
+      <div className="px-2 text-xs font-medium text-muted-foreground">라이브러리</div>
       <ul className="flex flex-col gap-0.5">
         {libraries?.map((lib) => (
           <li key={lib.id}>
@@ -21,8 +21,8 @@ export function Sidebar({ libraries, selected, onSelect }: Props) {
               disabled={lib.encrypted}
               onClick={() => onSelect(lib.id)}
               className={cn(
-                "h-8 w-full justify-start gap-2 px-2 text-sm font-normal",
-                selected === lib.id && "bg-accent font-medium",
+                "h-9 w-full justify-start gap-2 rounded-lg px-2 text-sm font-normal text-foreground/80 hover:bg-accent",
+                selected === lib.id && "bg-card font-medium text-foreground shadow-sm hover:bg-card",
                 lib.encrypted && "text-muted-foreground",
               )}
               title={lib.encrypted ? "암호화 라이브러리는 지원하지 않습니다" : lib.name}

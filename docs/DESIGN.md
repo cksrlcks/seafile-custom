@@ -8,6 +8,9 @@
 5. **다크 모드 대비.** 토큰은 `.dark`에서 재정의된다. 토글은 v1에 없지만 `<html class="dark">` 하나로 켜져야 한다.
 6. **검사.** `npm run lint:design`이 `src/features`의 원시 값을 잡는다. 빌드 전에 돌린다.
 
+## 비주얼 방향
+연한 회색 캔버스(`bg-background`) 위에 흰 둥근 패널(`bg-card rounded-2xl border shadow-sm`). 사이드바는 캔버스 색 그대로, 선택 항목만 `bg-card shadow-sm`. 포인트색은 `primary`(파랑) 하나. 폴더는 카드(`FolderGlyph` + 이름), 파일은 테이블(행 `h-10`).
+
 ## 새 컴포넌트가 필요할 때
 1. `npx shadcn@latest add <name>` 먼저.
 2. shadcn에 없으면 `src/components/ui/<name>.tsx`에 토큰 클래스만으로 작성한다.

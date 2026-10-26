@@ -42,7 +42,8 @@ export class StorageError extends Error {
 }
 
 export interface Connection {
-  kind: "seafile";
+  /** "mock"은 개발·화면 확인용 (서버 없음) */
+  kind: "seafile" | "mock";
   baseUrl: string;
 }
 

@@ -35,7 +35,8 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      await login({ kind: "seafile", baseUrl: baseUrl.trim().replace(/\/+$/, "") }, username, password, otp || undefined);
+      const url = baseUrl.trim().replace(/\/+$/, "");
+      await login({ kind: url === "mock" ? "mock" : "seafile", baseUrl: url }, username, password, otp || undefined);
     } catch (err) {
       setError(describe(err, setOtpRequired));
     } finally {
@@ -45,8 +46,8 @@ export function LoginScreen() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-background">
-      <form onSubmit={submit} className="flex w-80 flex-col gap-2 rounded-md border border-border bg-card p-4">
-        <h1 className="mb-2 text-sm font-semibold">seadrive 로그인</h1>
+      <form onSubmit={submit} className="flex w-80 flex-col gap-2 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h1 className="mb-2 text-base font-semibold">seadrive</h1>
         <label className="text-xs text-muted-foreground">서버 주소</label>
         <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." required />
         <label className="text-xs text-muted-foreground">아이디</label>
