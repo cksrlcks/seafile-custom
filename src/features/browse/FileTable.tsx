@@ -88,7 +88,7 @@ export function FileTable(p: Props) {
             <div className="flex flex-wrap gap-5">{files.map((f) => card(f, () => p.onOpenFile(f)))}</div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              <table className="w-full table-fixed border-collapse text-[15px]">
+              <table className="w-full table-fixed border-collapse text-md">
                 <thead className="bg-muted/40 text-sm text-muted-foreground">
                   <tr className="h-13 border-b border-border">
                     <th className="w-14 pl-5">

@@ -136,7 +136,7 @@ function Row({
         onClick={onClick}
         title={title ?? label}
         className={cn(
-          "h-10 w-full justify-start gap-2.5 rounded-xl pr-3 text-[15px] font-normal text-foreground/80 hover:bg-accent",
+          "h-10 w-full justify-start gap-2.5 rounded-xl pr-3 text-md font-normal text-foreground/80 hover:bg-accent",
           chevron ? "pl-8" : "pl-3",
           selected && "bg-card font-medium text-foreground shadow-sm hover:bg-card",
           disabled && "text-muted-foreground",

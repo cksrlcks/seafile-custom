@@ -6,6 +6,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    /* 15px: 목록·카드 본문 (디자인 시안 기준) */
+    --text-md: 0.9375rem;
+    --text-md--line-height: 1.4;
     --font-heading: var(--font-sans);
     --font-sans: "Inter Variable", "Pretendard", system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);

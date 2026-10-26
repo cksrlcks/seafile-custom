@@ -47,7 +47,7 @@ export function EntryCard({ entry, checked, onToggle, onOpen, renaming, onRename
       {renaming ? (
         <InlineName initial={entry.name} onSubmit={onRenameSubmit} onCancel={onRenameCancel} className="mx-2 h-8 text-center text-sm" />
       ) : (
-        <span className="w-full truncate px-2 text-center text-[15px] font-medium">{entry.name}</span>
+        <span className="w-full truncate px-2 text-center text-md font-medium">{entry.name}</span>
       )}
       <span className="-mt-2 truncate text-center text-xs text-muted-foreground">
         {entry.type === "file" ? `${formatSize(entry.size)} · ` : ""}
