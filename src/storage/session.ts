@@ -4,9 +4,21 @@ export interface Session {
   connection: Connection;
   token: string | null;
 }
+export interface LoginPrefs {
+  /** "아이디 저장"이 켜져 있으면 마지막 아이디 */
+  username: string | null;
+  /** 자동 로그인: 토큰을 앱을 닫아도 유지(localStorage) / 끄면 이번 실행 동안만(sessionStorage) */
+  autoLogin: boolean;
+}
+interface Stores {
+  local: Storage;
+  session: Storage;
+}
 
 const KEY = "seadrive.session";
+const PREFS_KEY = "seadrive.loginPrefs";
 const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "https://seafile.heavybear-lab.net" }, token: null };
+const defaultStores = (): Stores => ({ local: localStorage, session: sessionStorage });
 
 /** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. */
 export function connectionFor(url: string): Connection {
@@ -14,22 +26,44 @@ export function connectionFor(url: string): Connection {
   return { kind: baseUrl === "mock" ? "mock" : "seafile", baseUrl };
 }
 
-export function loadSession(storage: Storage = localStorage): Session {
+function parse(raw: string | null): Partial<Session> | null {
   try {
-    const raw = storage.getItem(KEY);
-    if (!raw) return DEFAULT;
-    const parsed = JSON.parse(raw) as Partial<Session>;
-    if (!parsed.connection?.baseUrl) return DEFAULT;
-    return { connection: parsed.connection, token: parsed.token ?? null };
+    return raw ? (JSON.parse(raw) as Partial<Session>) : null;
   } catch {
-    return DEFAULT;
+    return null;
   }
 }
 
-export function saveSession(s: Session, storage: Storage = localStorage): void {
-  storage.setItem(KEY, JSON.stringify(s));
+/** 연결 정보는 항상 localStorage. 토큰은 자동 로그인이면 localStorage, 아니면 sessionStorage에서 읽는다. */
+export function loadSession(stores: Stores = defaultStores()): Session {
+  const local = parse(stores.local.getItem(KEY));
+  const sess = parse(stores.session.getItem(KEY));
+  const connection = local?.connection?.baseUrl ? local.connection : sess?.connection?.baseUrl ? sess.connection : DEFAULT.connection;
+  return { connection, token: local?.token ?? sess?.token ?? null };
 }
 
-export function clearToken(storage: Storage = localStorage): void {
-  saveSession({ ...loadSession(storage), token: null }, storage);
+export function saveSession(s: Session, opts: { persistent?: boolean } = {}, stores: Stores = defaultStores()): void {
+  const persistent = opts.persistent ?? true;
+  stores.local.setItem(KEY, JSON.stringify({ connection: s.connection, token: persistent ? s.token : null }));
+  if (persistent) stores.session.removeItem(KEY);
+  else stores.session.setItem(KEY, JSON.stringify(s));
+}
+
+export function clearToken(stores: Stores = defaultStores()): void {
+  const cur = loadSession(stores);
+  stores.local.setItem(KEY, JSON.stringify({ connection: cur.connection, token: null }));
+  stores.session.removeItem(KEY);
+}
+
+export function loadPrefs(local: Storage = localStorage): LoginPrefs {
+  try {
+    const p = JSON.parse(local.getItem(PREFS_KEY) ?? "{}") as Partial<LoginPrefs>;
+    return { username: p.username ?? null, autoLogin: p.autoLogin ?? true };
+  } catch {
+    return { username: null, autoLogin: true };
+  }
+}
+
+export function savePrefs(p: LoginPrefs, local: Storage = localStorage): void {
+  local.setItem(PREFS_KEY, JSON.stringify(p));
 }

@@ -5,7 +5,7 @@ import type { Connection, StorageProvider } from "./StorageProvider";
 
 interface SessionApi {
   session: Session;
-  login(conn: Connection, username: string, password: string, otp?: string): Promise<void>;
+  login(conn: Connection, username: string, password: string, otp?: string, opts?: { persistent?: boolean }): Promise<void>;
   logout(): void;
   onUnauthorized(): void;
 }
@@ -17,11 +17,11 @@ export function StorageRoot({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>(() => loadSession());
   const provider = useMemo(() => createProvider(session.connection, session.token), [session]);
 
-  const login = useCallback(async (conn: Connection, username: string, password: string, otp?: string) => {
+  const login = useCallback(async (conn: Connection, username: string, password: string, otp?: string, opts?: { persistent?: boolean }) => {
     const p = createProvider(conn, null);
     await p.login(username, password, otp);
     const next: Session = { connection: conn, token: p.token };
-    saveSession(next);
+    saveSession(next, opts);
     setSession(next);
   }, []);
 

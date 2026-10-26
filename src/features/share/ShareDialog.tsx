@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useStorage } from "@/storage/StorageContext";
+import { directDownloadUrl } from "./shareUrls";
 import type { Entry } from "@/storage/StorageProvider";
 
 interface Props {
@@ -25,7 +26,7 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
   const storage = useStorage();
   const [password, setPassword] = useState("");
   const [expireDays, setExpireDays] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"page" | "direct" | null>(null);
   const create = useMutation({
     mutationFn: () =>
       storage.createShareLink(libId, entry.path, {
@@ -34,11 +35,11 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
       }),
   });
 
-  async function copy() {
+  async function copy(kind: "page" | "direct") {
     if (!create.data) return;
-    await navigator.clipboard.writeText(create.data.url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    await navigator.clipboard.writeText(kind === "direct" ? directDownloadUrl(create.data.url) : create.data.url);
+    setCopied(kind);
+    setTimeout(() => setCopied(null), 2000);
   }
 
   return (
@@ -48,14 +49,29 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
         <DialogDescription className="truncate">{entry.name}</DialogDescription>
       </DialogHeader>
       {create.data ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <Input readOnly value={create.data.url} onFocus={(e) => e.target.select()} />
-            <Button variant="outline" onClick={copy} className="shrink-0">
-              {copied ? <IconCheck className="size-4" /> : <IconCopy className="size-4" />}
-              {copied ? "복사됨" : "복사"}
-            </Button>
-          </div>
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            공유 페이지 링크
+            <div className="flex gap-2">
+              <Input readOnly value={create.data.url} onFocus={(e) => e.target.select()} />
+              <Button variant="outline" onClick={() => copy("page")} className="shrink-0">
+                {copied === "page" ? <IconCheck className="size-4" /> : <IconCopy className="size-4" />}
+                {copied === "page" ? "복사됨" : "복사"}
+              </Button>
+            </div>
+          </label>
+          {entry.type === "file" && (
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              직접 다운로드 링크 (페이지 없이 바로 저장)
+              <div className="flex gap-2">
+                <Input readOnly value={directDownloadUrl(create.data.url)} onFocus={(e) => e.target.select()} />
+                <Button variant="outline" onClick={() => copy("direct")} className="shrink-0">
+                  {copied === "direct" ? <IconCheck className="size-4" /> : <IconCopy className="size-4" />}
+                  {copied === "direct" ? "복사됨" : "복사"}
+                </Button>
+              </div>
+            </label>
+          )}
           {create.data.expiresAt && <p className="text-xs text-muted-foreground">{new Date(create.data.expiresAt * 1000).toLocaleDateString("ko-KR")}까지 유효</p>}
         </div>
       ) : (
