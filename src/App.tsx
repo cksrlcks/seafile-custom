@@ -1,18 +1,9 @@
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { LoginScreen } from "@/features/auth/LoginScreen";
-import { Button } from "@/components/ui/button";
+import { MainScreen } from "@/features/browse/MainScreen";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
-
-function MainScreen() {
-  const { logout } = useSession();
-  return (
-    <div className="p-4 text-sm">
-      로그인됨 <Button variant="outline" size="sm" onClick={logout}>로그아웃</Button>
-    </div>
-  );
-}
 
 function Gate() {
   const { session, onUnauthorized } = useSession();
