@@ -1,9 +1,0 @@
-- generic [ref=e4]:
-  - heading "seadrive" [level=1] [ref=e11]
-  - generic [ref=e12]: 서버 주소
-  - textbox "https://..." [ref=e13]: https://seafile.heavybear-lab.net
-  - generic [ref=e14]: 아이디
-  - textbox [ref=e15]
-  - generic [ref=e16]: 비밀번호
-  - textbox [ref=e17]
-  - button "로그인" [ref=e18]
