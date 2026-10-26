@@ -1,7 +1,8 @@
-import { IconChevronDown, IconChevronUp, IconCloud } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CloudMark } from "@/components/ui/cloud-mark";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/storage/StorageContext";
 import { connectionFor, loadPrefs, savePrefs } from "@/storage/session";
@@ -52,10 +53,8 @@ export function LoginScreen() {
       <div className="flex min-h-0 flex-1 items-center justify-center pb-9">
       <form onSubmit={submit} className="flex w-88 flex-col gap-4 rounded-xl border border-border bg-card p-8 text-sm shadow-float">
         <div className="flex flex-col items-center gap-2 pb-2">
-          <div className="flex h-10 w-16 items-center justify-center rounded-full bg-linear-to-br from-brand-a to-brand-b text-primary-foreground shadow-pill">
-            <IconCloud className="size-6" stroke={2} />
-          </div>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">Drive</h1>
+          <CloudMark className="size-14" />
+          <h1 className="text-xl font-semibold tracking-tight">Drive</h1>
           <p className="text-xs tracking-normal text-muted-foreground">저장소에 연결하려면 로그인하세요</p>
         </div>
 
@@ -91,8 +90,8 @@ export function LoginScreen() {
           {busy ? "로그인 중..." : "로그인"}
         </Button>
 
-        <div className="-mb-2 flex flex-col gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-          <button type="button" onClick={() => setShowServer((v) => !v)} className="flex items-center justify-between rounded px-1 py-0.5 hover:text-foreground">
+        <div className="flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
+          <button type="button" onClick={() => setShowServer((v) => !v)} className="mx-auto flex items-center gap-1 rounded px-2 py-0.5 hover:text-foreground">
             <span className="truncate">
               서버 <span className="text-foreground">{host}</span>
             </span>
