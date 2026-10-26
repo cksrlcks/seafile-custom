@@ -1,0 +1,53 @@
+# seadrive 데스크톱 앱용 CORS (Dokploy / Traefik 배포용)
+#
+# Dokploy는 Traefik이 리버스 프록시다. 이 파일을 라즈베리파이의
+#   /etc/dokploy/traefik/dynamic/seafile-cors.yml
+# 로 저장하면 Traefik이 자동으로 읽는다 (재시작 불필요).
+#
+# 그다음 Dokploy가 만든 라우터 파일(/etc/dokploy/traefik/dynamic/<서비스이름>.yml)의
+# https 라우터에 아래 한 줄을 추가한다:
+#   middlewares:
+#     - redirect-to-https      # (있으면 그대로 두고)
+#     - seafile-cors           # ← 추가 (파일 이름이 아니라 아래 미들웨어 이름 + "@file")
+# 정확한 표기는 `seafile-cors@file` 이다. 예:
+#   http:
+#     routers:
+#       seafile-router-1:
+#         rule: Host(`seafile.heavybear-lab.net`)
+#         entryPoints: [websecure]
+#         middlewares: [seafile-cors@file]
+#         service: seafile-service-1
+#         tls: { certResolver: letsencrypt }
+#
+# 주의: Dokploy에서 도메인 설정을 바꾸면 라우터 파일이 다시 생성되어 middlewares 줄이 사라질 수 있다. 그때 다시 넣는다.
+#
+# 검증 (PC에서):
+#   curl -si -X OPTIONS https://seafile.heavybear-lab.net/api2/auth-token/ \
+#     -H 'Origin: http://tauri.localhost' -H 'Access-Control-Request-Method: POST' \
+#     -H 'Access-Control-Request-Headers: authorization,content-type'
+#   → 200 또는 204, Access-Control-Allow-Origin: http://tauri.localhost 가 한 줄.
+
+http:
+  middlewares:
+    seafile-cors:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - Authorization
+          - Content-Type
+          - Content-Range
+          - Content-Disposition
+          - X-SEAFILE-OTP
+        accessControlAllowOriginList:
+          - http://tauri.localhost   # Windows WebView2
+          - tauri://localhost        # macOS / Linux
+          - http://localhost:1420    # vite dev
+        accessControlExposeHeaders:
+          - X-Seafile-OTP
+        accessControlMaxAge: 600
+        addVaryHeader: true
