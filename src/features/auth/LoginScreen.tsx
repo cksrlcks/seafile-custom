@@ -86,12 +86,12 @@ export function LoginScreen() {
         </Button>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
-          <button type="button" onClick={() => setShowServer((v) => !v)} className="mx-auto flex items-center gap-1 rounded px-2 py-0.5 hover:text-foreground">
-            <span className="flex items-center gap-2 truncate">
-              <span>서버</span>
-              <span className="text-foreground">{host}</span>
+          <button type="button" onClick={() => setShowServer((v) => !v)} className="flex w-full items-center justify-between rounded py-0.5 hover:text-foreground">
+            <span>서버</span>
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="truncate text-foreground">{host}</span>
+              {showServer ? <IconChevronUp className="size-3.5 shrink-0" /> : <IconChevronDown className="size-3.5 shrink-0" />}
             </span>
-            {showServer ? <IconChevronUp className="size-3.5" /> : <IconChevronDown className="size-3.5" />}
           </button>
           {showServer && <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="h-8 md:text-xs" required />}
         </div>
