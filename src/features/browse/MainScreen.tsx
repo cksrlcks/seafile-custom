@@ -11,6 +11,7 @@ import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
 import { OverwriteDialog, type OverwriteChoice } from "@/features/upload/OverwriteDialog";
 import { planUploads } from "@/features/upload/planUploads";
 import { UploadPanel } from "@/features/upload/UploadPanel";
+import { DownloadPanel } from "@/features/download/DownloadPanel";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
 import { joinPath, parentPath, splitPath } from "@/storage/path";
@@ -145,11 +146,11 @@ export function MainScreen() {
   function open(entry: Entry) {
     if (entry.type === "dir") setLoc({ ...loc, path: entry.path });
     else if (previewKind(entry.name)) setPreviewPath(entry.path);
-    else ops.download.mutate(entry);
+    else ops.download.mutate([entry]);
   }
   const menuActions: EntryMenuActions = {
     onOpen: open,
-    onDownload: (e) => ops.download.mutate(e),
+    onDownload: (e) => ops.download.mutate(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
     onRename: (e) => setRenamingPath(e.path),
     onShare: (e) => setSharing(e),
     onDelete: (e) => setDeleting(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
@@ -216,8 +217,8 @@ export function MainScreen() {
         menu={{
           newFolder: () => setCreatingFolder(true),
           upload: () => dropRef.current?.open(),
-          selection: { count: selectedEntries.length, singleFile: selectedEntries.length === 1 && selectedEntries[0].type === "file" },
-          download: () => selectedEntries[0] && ops.download.mutate(selectedEntries[0]),
+          selection: { count: selectedEntries.length, hasFile: selectedEntries.some((e) => e.type === "file") },
+          download: () => ops.download.mutate(selectedEntries),
           share: () => selectedEntries[0] && setSharing(selectedEntries[0]),
           rename: () => selectedEntries[0] && setRenamingPath(selectedEntries[0].path),
           remove: () => setDeleting(selectedEntries),
@@ -295,7 +296,10 @@ export function MainScreen() {
               )}
             </div>
           </DropZone>
-          <UploadPanel />
+          <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
+            <DownloadPanel />
+            <UploadPanel />
+          </div>
         </main>
       </div>
 
@@ -307,7 +311,7 @@ export function MainScreen() {
       />
 
       {loc.libId && (
-        <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={() => setPreviewPath(null)} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate(e)} />
+        <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={() => setPreviewPath(null)} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate([e])} />
       )}
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />

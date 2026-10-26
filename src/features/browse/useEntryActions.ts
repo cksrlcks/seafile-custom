@@ -2,25 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useStorage } from "@/storage/StorageContext";
 import { joinPath, parentPath } from "@/storage/path";
 import type { Entry } from "@/storage/StorageProvider";
+import { downloadEntries } from "@/features/download/useDownloads";
 import type { Location } from "./useCurrentDir";
-
-const isTauri = () => "__TAURI_INTERNALS__" in window;
-
-/** Tauri WebView2의 window.open은 다운로드를 보장하지 않아 시스템 브라우저로 넘긴다. 브라우저 모드는 <a download>. */
-async function openDownload(url: string, name: string) {
-  if (isTauri()) {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(url);
-    return;
-  }
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
 
 export function useEntryActions(loc: Location) {
   const storage = useStorage();
@@ -43,11 +26,12 @@ export function useEntryActions(loc: Location) {
       void qc.invalidateQueries({ queryKey: ["account"] });
     },
   });
+  /** 파일 1개는 저장 위치 선택, 여러 개는 폴더 선택. 실제 전송은 다운로드 패널에서 진행 */
   const download = useMutation({
-    mutationFn: async (entry: Entry) => openDownload(await storage.downloadUrl(libId, entry.path), entry.name),
+    mutationFn: (entries: Entry[]) => downloadEntries(entries, (e) => storage.downloadUrl(libId, e.path)),
   });
 
-  const labels = { mkdir: "새 폴더를 만들지 못했습니다", rename: "이름을 바꾸지 못했습니다", remove: "삭제하지 못했습니다", download: "다운로드 링크를 받지 못했습니다" };
+  const labels = { mkdir: "새 폴더를 만들지 못했습니다", rename: "이름을 바꾸지 못했습니다", remove: "삭제하지 못했습니다", download: "다운로드를 시작하지 못했습니다" };
   const failed = ([["mkdir", mkdir], ["rename", rename], ["remove", remove], ["download", download]] as const).find(([, m]) => m.error);
   const error = failed ? { message: labels[failed[0]], detail: (failed[1].error as Error).message, reset: () => failed[1].reset() } : null;
 

@@ -37,7 +37,7 @@ export function UploadPanel() {
   if (total === 0) return null;
 
   return (
-    <div className="absolute right-3 bottom-3 z-20 w-96 rounded-lg border border-border bg-popover text-sm shadow-float">
+    <div className="w-96 rounded-lg border border-border bg-popover text-sm shadow-float">
       <div className="flex h-9 items-center gap-2.5 px-3">
         <span className="shrink-0 font-medium">
           업로드 {done}/{total}

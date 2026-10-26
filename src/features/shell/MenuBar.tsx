@@ -10,7 +10,7 @@ export interface MenuActions {
   newFolder(): void;
   upload(): void;
   /** 선택 항목이 있을 때만 활성 */
-  selection: { count: number; singleFile: boolean };
+  selection: { count: number; hasFile: boolean };
   download(): void;
   share(): void;
   rename(): void;
@@ -55,7 +55,7 @@ export function MenuBar(a: MenuActions) {
               파일 업로드…
             </MenubarItem>
             <MenubarSeparator />
-            <MenubarItem disabled={!a.selection.singleFile} onClick={a.download} className={item}>
+            <MenubarItem disabled={!a.selection.hasFile} onClick={a.download} className={item}>
               다운로드
             </MenubarItem>
             <MenubarItem disabled={a.selection.count !== 1} onClick={a.share} className={item}>
