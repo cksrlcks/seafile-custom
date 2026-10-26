@@ -17,9 +17,9 @@ export interface EntryMenuActions {
 }
 
 /** 우클릭 메뉴. children이 트리거(카드) 또는 asRow면 테이블 행의 셀들. */
-export function EntryContextMenu({ entry, actions, children, asRow }: { entry: Entry; actions: EntryMenuActions; children: ReactNode; asRow?: boolean }) {
+export function EntryContextMenu({ entry, actions, children, asRow, selected }: { entry: Entry; actions: EntryMenuActions; children: ReactNode; asRow?: boolean; selected?: boolean }) {
   const trigger = asRow ? (
-    <tr className="h-14 cursor-default select-none border-b border-border/60 last:border-0 hover:bg-accent/50" />
+    <tr className={"h-14 cursor-default select-none border-b border-border/60 last:border-0 hover:bg-accent/50" + (selected ? " bg-accent/40" : "")} />
   ) : (
     <div className="contents" />
   );

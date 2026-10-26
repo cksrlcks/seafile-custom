@@ -14,3 +14,11 @@ describe("formatDate", () => {
     expect(formatDate(d.getTime() / 1000)).toBe("2026-10-26 09:05");
   });
 });
+
+describe("formatDateLong", () => {
+  it("formats Korean long date with weekday", async () => {
+    const { formatDateLong } = await import("./format");
+    const d = new Date(2025, 7, 25, 9, 0);
+    expect(formatDateLong(d.getTime() / 1000)).toBe("2025년 8월 25일 (월)");
+  });
+});
