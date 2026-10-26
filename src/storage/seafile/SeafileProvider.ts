@@ -49,6 +49,10 @@ export class SeafileProvider implements StorageProvider {
     return repos.map((r) => ({ id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted }));
   }
 
+  async renameLibrary(libId: string, newName: string): Promise<void> {
+    await this.api.postForm(`/api2/repos/${libId}/`, { repo_name: newName }, { op: "rename" });
+  }
+
   async listDir(libId: string, path: string): Promise<Entry[]> {
     const items = await this.api.get<DirentDto[]>(`/api2/repos/${libId}/dir/`, { p: path });
     return items

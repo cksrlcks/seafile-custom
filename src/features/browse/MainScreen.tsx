@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileStack, FolderPlus, LayoutGrid, List, LogOut, PanelLeft, RefreshCw, Trash2, Upload, User } from "lucide-react";
 import { cn } from "cn";
 import { useRef, useState } from "react";
@@ -12,9 +12,9 @@ import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { PreviewModal } from "@/features/preview/PreviewModal";
 import { previewKind } from "@/features/preview/previewKind";
 import { ShareDialog } from "@/features/share/ShareDialog";
-import { useSession } from "@/storage/StorageContext";
+import { useSession, useStorage } from "@/storage/StorageContext";
 import { baseName } from "@/storage/path";
-import type { Entry, UploadTask } from "@/storage/StorageProvider";
+import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import { Breadcrumb } from "./Breadcrumb";
 import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
@@ -25,7 +25,12 @@ import { useEntryActions } from "./useEntryActions";
 
 export function MainScreen() {
   const { session, logout } = useSession();
+  const storage = useStorage();
   const qc = useQueryClient();
+  const renameLibrary = useMutation({
+    mutationFn: ({ lib, newName }: { lib: Library; newName: string }) => storage.renameLibrary(lib.id, newName),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["libraries"] }),
+  });
   const [loc, setLocState] = useState<Location>({ libId: null, path: "/" });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<ViewMode>("list");
@@ -106,11 +111,20 @@ export function MainScreen() {
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      {sidebarOpen && <Sidebar libraries={libs.data} loc={loc} onNavigate={setLoc} onCollapse={() => setSidebarOpen(false)} />}
+      {sidebarOpen && (
+        <Sidebar
+          libraries={libs.data}
+          loc={loc}
+          onNavigate={setLoc}
+          onCollapse={() => setSidebarOpen(false)}
+          onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
+        />
+      )}
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
           {libs.error && <ErrorBanner message="라이브러리 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
+          {renameLibrary.error && <ErrorBanner message={`라이브러리 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
 
           {/* 시안 실측: 브레드크럼 바 84px, 15px 회색, 문서 아이콘 */}
           <div className="flex h-21 shrink-0 items-center gap-2.5 border-b border-border px-7">

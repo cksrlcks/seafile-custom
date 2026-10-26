@@ -1,6 +1,9 @@
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, PanelLeft } from "lucide-react";
 import { cn } from "cn";
 import { useState } from "react";
+import { Pencil } from "lucide-react";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { InlineName } from "./InlineName";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import type { Library } from "@/storage/StorageProvider";
@@ -11,10 +14,13 @@ interface Props {
   loc: Location;
   onNavigate(loc: Location): void;
   onCollapse(): void;
+  onRenameLibrary(lib: Library, newName: string): void;
 }
 
 /** 시안: 연회색(위가 살짝 밝은) 사이드바, 로고 18px, 섹션 라벨 15px 회색, 행 40px, 선택 행은 흰색+옅은 그림자 */
-export function Sidebar({ libraries, loc, onNavigate, onCollapse }: Props) {
+export function Sidebar({ libraries, loc, onNavigate, onCollapse, onRenameLibrary }: Props) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const names = libraries?.map((l) => l.name) ?? [];
   return (
     <aside className="flex w-80 shrink-0 flex-col gap-7 overflow-y-auto bg-linear-to-b from-sidebar to-sidebar-bottom px-6 pt-9 pb-6">
       <div className="flex h-8 items-center gap-2.5 px-1">
@@ -31,8 +37,30 @@ export function Sidebar({ libraries, loc, onNavigate, onCollapse }: Props) {
         {libraries?.map((lib) =>
           lib.encrypted ? (
             <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화 라이브러리는 지원하지 않습니다" />
+          ) : renamingId === lib.id ? (
+            <div key={lib.id} className="my-0.5 pl-3">
+              <InlineName
+                initial={lib.name}
+                existing={names.filter((n) => n !== lib.name)}
+                onSubmit={(n) => {
+                  setRenamingId(null);
+                  onRenameLibrary(lib, n);
+                }}
+                onCancel={() => setRenamingId(null)}
+                className="h-9 text-md"
+              />
+            </div>
           ) : (
-            <LibraryNode key={lib.id} lib={lib} loc={loc} onNavigate={onNavigate} />
+            <ContextMenu key={lib.id}>
+              <ContextMenuTrigger render={<div className="contents" />}>
+                <LibraryNode lib={lib} loc={loc} onNavigate={onNavigate} />
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onClick={() => setRenamingId(lib.id)}>
+                  <Pencil className="size-4" /> 이름 변경
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ),
         )}
       </section>

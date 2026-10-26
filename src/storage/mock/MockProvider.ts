@@ -53,6 +53,10 @@ export class MockProvider implements StorageProvider {
     await delay(200);
     return this.libs;
   }
+  async renameLibrary(libId: string, newName: string): Promise<void> {
+    await delay(150);
+    this.libs = this.libs.map((l) => (l.id === libId ? { ...l, name: newName } : l));
+  }
   async listDir(libId: string, path: string): Promise<Entry[]> {
     await delay(200);
     return [...this.get(libId, path)];

@@ -55,6 +55,7 @@ export interface StorageProvider {
   isLoggedIn(): boolean;
 
   listLibraries(): Promise<Library[]>;
+  renameLibrary(libId: string, newName: string): Promise<void>;
   listDir(libId: string, path: string): Promise<Entry[]>;
 
   upload(

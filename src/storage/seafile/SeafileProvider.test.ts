@@ -92,3 +92,14 @@ describe("SeafileProvider.createShareLink", () => {
     expect(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).toBe("repo_id=r&path=%2Fa.txt");
   });
 });
+
+describe("SeafileProvider.renameLibrary", () => {
+  it("posts op=rename with repo_name", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").renameLibrary("r1", "새 이름");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api2/repos/r1/?op=rename");
+    expect(init.method).toBe("POST");
+    expect(String(init.body)).toBe("repo_name=%EC%83%88+%EC%9D%B4%EB%A6%84");
+  });
+});
