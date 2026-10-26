@@ -33,3 +33,43 @@ describe("SeafileProvider", () => {
     expect(entries[0].type).toBe("dir");
   });
 });
+
+describe("SeafileProvider file operations", () => {
+  it("rename dir uses dir endpoint", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").rename("r", "/a/old", "new", "dir");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api2/repos/r/dir/?p=%2Fa%2Fold");
+    expect(init.method).toBe("POST");
+    expect(String(init.body)).toBe("operation=rename&newname=new");
+  });
+
+  it("rename file uses file endpoint", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").rename("r", "/a.txt", "b.txt", "file");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api2/repos/r/file/?p=%2Fa.txt");
+  });
+
+  it("remove file uses DELETE", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").remove("r", "/a.txt", "file");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api2/repos/r/file/?p=%2Fa.txt");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("mkdir posts operation=mkdir", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").mkdir("r", "/new dir");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api2/repos/r/dir/?p=%2Fnew+dir");
+    expect(String(init.body)).toBe("operation=mkdir");
+  });
+
+  it("downloadUrl returns the temp link", async () => {
+    fetchMock.mockResolvedValue(json("https://host.example/seafhttp/files/abc/a.txt"));
+    const url = await new SeafileProvider("https://host.example", "t").downloadUrl("r", "/a.txt");
+    expect(url).toBe("https://host.example/seafhttp/files/abc/a.txt");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api2/repos/r/file/?p=%2Fa.txt&reuse=1");
+  });
+});

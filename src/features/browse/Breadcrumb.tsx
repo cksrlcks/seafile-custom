@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { splitPath } from "@/storage/path";
 
@@ -17,9 +16,9 @@ export function Breadcrumb({ libName, path, onNavigate }: Props) {
         const last = i === crumbs.length - 1;
         return (
           <span key={c.to} className="flex min-w-0 items-center gap-1">
-            {i > 0 && <ChevronRight className="size-4 shrink-0 text-muted-foreground" />}
+            {i > 0 && <span className="px-1 text-muted-foreground">•</span>}
             {last ? (
-              <span className="truncate font-medium">{c.label}</span>
+              <span className="truncate text-muted-foreground">{c.label}</span>
             ) : (
               <Button variant="ghost" size="xs" onClick={() => onNavigate(c.to)} className="truncate font-normal text-muted-foreground">
                 {c.label}

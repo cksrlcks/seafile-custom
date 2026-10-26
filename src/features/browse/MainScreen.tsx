@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, Upload, User } from "lucide-react";
+import { FileStack, FolderPlus, LogOut, RefreshCw, Upload, User } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -12,6 +12,9 @@ import { useSession } from "@/storage/StorageContext";
 import { baseName } from "@/storage/path";
 import type { Entry, UploadTask } from "@/storage/StorageProvider";
 import { Breadcrumb } from "./Breadcrumb";
+import type { EntryMenuActions } from "./ContextMenu";
+import { DeleteDialog } from "./DeleteDialog";
+import { useEntryActions } from "./useEntryActions";
 import { FileTable, FileTableSkeleton } from "./FileTable";
 import { Sidebar } from "./Sidebar";
 import { useCurrentDir, useLibraries, type Location } from "./useCurrentDir";
@@ -43,59 +46,86 @@ export function MainScreen() {
     setPending(null);
   }
 
+  const ops = useEntryActions(loc);
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [deleting, setDeleting] = useState<Entry | null>(null);
+  const menuActions: EntryMenuActions = {
+    onDownload: (e) => ops.download.mutate(e),
+    onRename: (e) => setRenamingPath(e.path),
+    onDelete: (e) => setDeleting(e),
+  };
+
   function openFile(entry: Entry) {
-    // Task 9/10에서 미리보기·다운로드로 연결
-    console.log("open", entry.path);
+    // Task 10에서 미리보기로 연결. 지금은 다운로드.
+    ops.download.mutate(entry);
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background p-3 text-foreground">
-      <header className="flex h-10 shrink-0 items-center gap-2 px-2">
-        <span className="text-sm font-semibold">seadrive</span>
-        <div className="flex-1" />
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
-            <User className="size-4" />
-            <span className="max-w-40 truncate text-xs">{session.connection.baseUrl.replace(/^https?:\/\//, "")}</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={logout}>
-              <LogOut className="size-4" /> 로그아웃
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </header>
-
+    <div className="flex h-screen flex-col bg-background pr-3 pb-3 text-foreground">
       <div className="flex min-h-0 flex-1">
         <Sidebar libraries={libs.data} selected={loc.libId} onSelect={(libId) => setLoc({ libId, path: "/" })} />
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <main className="mt-3 flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           {libs.error && <ErrorBanner message="라이브러리 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
           {loc.libId === null ? (
             <Empty text="라이브러리를 선택하세요" />
           ) : (
             <>
-              <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
+              <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-6">
+                <FileStack className="size-4 text-muted-foreground" />
                 <Breadcrumb libName={libName} path={loc.path} onNavigate={(path) => setLoc({ ...loc, path })} />
+                <div className="flex-1" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
+                    <User className="size-4" />
+                    <span className="max-w-40 truncate text-xs">{session.connection.baseUrl.replace(/^https?:\/\//, "")}</span>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={logout}>
+                      <LogOut className="size-4" /> 로그아웃
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
-                <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{title}</h1>
+              <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-6">
+                <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{title}</h1>
                 <Button variant="ghost" size="icon-sm" title="새로고침" onClick={() => qc.invalidateQueries({ queryKey: ["dir"] })}>
                   <RefreshCw className="size-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setCreatingFolder(true)}>
+                  <FolderPlus className="size-4" /> 새 폴더
                 </Button>
                 <Button size="sm" onClick={() => dropRef.current?.open()}>
                   <Upload className="size-4" /> 업로드
                 </Button>
               </div>
-              <div className="relative flex min-h-0 flex-1 flex-col overflow-auto bg-background/40">
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-auto">
                 <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
                   {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
                   {dir.isLoading ? (
                     <FileTableSkeleton />
-                  ) : dir.data && dir.data.length === 0 ? (
+                  ) : dir.data && dir.data.length === 0 && !creatingFolder ? (
                     <Empty text="파일을 끌어다 놓으세요" />
                   ) : dir.data ? (
-                    <FileTable entries={dir.data} onOpenDir={(path) => setLoc({ ...loc, path })} onOpenFile={openFile} />
+                    <FileTable
+                      entries={dir.data}
+                      onOpenDir={(path) => setLoc({ ...loc, path })}
+                      onOpenFile={openFile}
+                      actions={menuActions}
+                      renamingPath={renamingPath}
+                      onRenameSubmit={(entry, newName) => {
+                        setRenamingPath(null);
+                        ops.rename.mutate({ entry, newName });
+                      }}
+                      onRenameCancel={() => setRenamingPath(null)}
+                      creatingFolder={creatingFolder}
+                      onCreateFolder={(name) => {
+                        setCreatingFolder(false);
+                        ops.mkdir.mutate(name);
+                      }}
+                      onCreateFolderCancel={() => setCreatingFolder(false)}
+                    />
                   ) : null}
                 </DropZone>
               </div>
@@ -105,6 +135,14 @@ export function MainScreen() {
       </div>
       <UploadPanel />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
+      <DeleteDialog
+        entry={deleting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) ops.remove.mutate(deleting);
+          setDeleting(null);
+        }}
+      />
     </div>
   );
 }

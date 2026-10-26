@@ -1,4 +1,4 @@
-import type { Entry, Library, ShareLink, StorageProvider, UploadTask } from "../StorageProvider";
+import { StorageError, type Entry, type Library, type ShareLink, type StorageProvider, type UploadTask } from "../StorageProvider";
 import { joinPath } from "../path";
 import { SeafileApi } from "./api";
 import { CHUNK_SIZE, chunkRanges } from "./chunk";
@@ -105,23 +105,26 @@ export class SeafileProvider implements StorageProvider {
     return `${url}?ret-json=1`;
   }
 
-  downloadUrl(_libId: string, _path: string): Promise<string> {
-    throw new Error("not implemented");
+  async downloadUrl(libId: string, path: string): Promise<string> {
+    return this.api.get<string>(`/api2/repos/${libId}/file/`, { p: path, reuse: "1" });
   }
   previewUrl(libId: string, path: string): Promise<string> {
     return this.downloadUrl(libId, path);
   }
-  readText(_libId: string, _path: string): Promise<string> {
-    throw new Error("not implemented");
+  async readText(libId: string, path: string): Promise<string> {
+    const url = await this.previewUrl(libId, path);
+    const res = await fetch(url);
+    if (!res.ok) throw new StorageError("server", res.statusText, res.status);
+    return res.text();
   }
-  mkdir(_libId: string, _path: string): Promise<void> {
-    throw new Error("not implemented");
+  async mkdir(libId: string, path: string): Promise<void> {
+    await this.api.postForm(`/api2/repos/${libId}/dir/`, { operation: "mkdir" }, { p: path });
   }
-  rename(_libId: string, _path: string, _newName: string, _type: "file" | "dir"): Promise<void> {
-    throw new Error("not implemented");
+  async rename(libId: string, path: string, newName: string, type: "file" | "dir"): Promise<void> {
+    await this.api.postForm(`/api2/repos/${libId}/${type}/`, { operation: "rename", newname: newName }, { p: path });
   }
-  remove(_libId: string, _path: string, _type: "file" | "dir"): Promise<void> {
-    throw new Error("not implemented");
+  async remove(libId: string, path: string, type: "file" | "dir"): Promise<void> {
+    await this.api.delete(`/api2/repos/${libId}/${type}/`, { p: path });
   }
   createShareLink(_libId: string, _path: string, _opts?: { password?: string; expireDays?: number }): Promise<ShareLink> {
     throw new Error("not implemented");
