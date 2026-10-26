@@ -5,6 +5,7 @@ import { MainScreen } from "@/features/browse/MainScreen";
 import { UploadQueueRoot } from "@/features/upload/useUploadQueue";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 function Gate() {
   const { session, onUnauthorized } = useSession();
@@ -34,7 +35,9 @@ function Gate() {
 export default function App() {
   return (
     <StorageRoot>
-      <Gate />
+      <TooltipProvider delay={400}>
+        <Gate />
+      </TooltipProvider>
     </StorageRoot>
   );
 }

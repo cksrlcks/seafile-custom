@@ -1,46 +1,56 @@
 import { Download, Link, Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  ContextMenu as Root,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+import { ContextMenu as Root, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Entry } from "@/storage/StorageProvider";
 
 export interface EntryMenuActions {
+  onOpen(entry: Entry): void;
   onDownload(entry: Entry): void;
   onRename(entry: Entry): void;
   onShare?(entry: Entry): void;
   onDelete(entry: Entry): void;
 }
 
-/** 우클릭 메뉴. children이 트리거(카드) 또는 asRow면 테이블 행의 셀들. */
-export function EntryContextMenu({ entry, actions, children, asRow, selected }: { entry: Entry; actions: EntryMenuActions; children: ReactNode; asRow?: boolean; selected?: boolean }) {
-  const trigger = asRow ? (
-    <tr className={"h-14 cursor-default select-none border-b border-border last:border-0 hover:bg-muted/60" + (selected ? " bg-muted/50" : "")} />
-  ) : (
-    <div className="contents" />
-  );
+interface Props {
+  entry: Entry;
+  actions: EntryMenuActions;
+  children: ReactNode;
+  /** 테이블 행이면 <tr>, 아니면 <div>를 트리거로 */
+  asRow?: boolean;
+  className?: string;
+  onContextMenu?(): void;
+  onClick?(e: React.MouseEvent): void;
+  onDoubleClick?(): void;
+  dataPath?: string;
+}
+
+export function EntryContextMenu({ entry, actions, children, asRow, className, onContextMenu, onClick, onDoubleClick, dataPath }: Props) {
+  const handlers = { className, onContextMenu, onClick, onDoubleClick, "data-path": dataPath };
+  const trigger = asRow ? <tr {...handlers} /> : <div {...handlers} />;
   return (
     <Root>
       <ContextMenuTrigger render={trigger}>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="min-w-44">
+        <ContextMenuItem onClick={() => actions.onOpen(entry)} className="text-ui">
+          열기
+          <ContextMenuShortcut>Enter</ContextMenuShortcut>
+        </ContextMenuItem>
         {entry.type === "file" && (
-          <ContextMenuItem onClick={() => actions.onDownload(entry)}>
+          <ContextMenuItem onClick={() => actions.onDownload(entry)} className="text-ui">
             <Download className="size-4" /> 다운로드
           </ContextMenuItem>
         )}
-        <ContextMenuItem onClick={() => actions.onRename(entry)}>
+        <ContextMenuItem onClick={() => actions.onRename(entry)} className="text-ui">
           <Pencil className="size-4" /> 이름 변경
+          <ContextMenuShortcut>F2</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem disabled={!actions.onShare} onClick={() => actions.onShare?.(entry)}>
+        <ContextMenuItem disabled={!actions.onShare} onClick={() => actions.onShare?.(entry)} className="text-ui">
           <Link className="size-4" /> 공유 링크
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => actions.onDelete(entry)}>
+        <ContextMenuItem variant="destructive" onClick={() => actions.onDelete(entry)} className="text-ui">
           <Trash2 className="size-4" /> 삭제
+          <ContextMenuShortcut>Del</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
     </Root>

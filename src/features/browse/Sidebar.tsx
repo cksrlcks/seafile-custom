@@ -1,78 +1,61 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, PanelLeft } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, Pencil } from "lucide-react";
 import { cn } from "cn";
-import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { InlineName } from "./InlineName";
-import { StorageCard } from "./StorageCard";
-import { Button } from "@/components/ui/button";
 import type { Library } from "@/storage/StorageProvider";
+import { InlineName } from "./InlineName";
 import { useCurrentDir, type Location } from "./useCurrentDir";
 
 interface Props {
   libraries: Library[] | undefined;
   loc: Location;
   onNavigate(loc: Location): void;
-  onCollapse(): void;
   onRenameLibrary(lib: Library, newName: string): void;
 }
 
-/** 시안: 연회색(위가 살짝 밝은) 사이드바, 로고 18px, 섹션 라벨 15px 회색, 행 40px, 선택 행은 흰색+옅은 그림자 */
-export function Sidebar({ libraries, loc, onNavigate, onCollapse, onRenameLibrary }: Props) {
+/** macOS 소스 리스트 스타일: 연회색, 11px 섹션 라벨, 28px 행, 선택은 옅은 파란 틴트 */
+export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const names = libraries?.map((l) => l.name) ?? [];
   return (
-    <aside className="flex w-80 shrink-0 flex-col gap-7 overflow-y-auto bg-linear-to-b from-sidebar to-sidebar-bottom px-6 pt-9 pb-6">
-      <div className="flex h-8 items-center gap-2.5 px-1">
-        <span className="text-xl font-semibold tracking-tight">Drive</span>
-        <div className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={onCollapse} title="사이드바 접기" className="text-muted-foreground hover:bg-sidebar-accent">
-          <PanelLeft className="size-4.5" />
-        </Button>
-      </div>
-
-      <section className="flex flex-col gap-0.5">
-        <div className="mb-2 px-1 text-md text-muted-foreground">내 저장소</div>
-        {libraries?.map((lib) =>
-          lib.encrypted ? (
-            <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />
-          ) : renamingId === lib.id ? (
-            <div key={lib.id} className="my-0.5 pl-3">
-              <InlineName
-                initial={lib.name}
-                existing={names.filter((n) => n !== lib.name)}
-                onSubmit={(n) => {
-                  setRenamingId(null);
-                  onRenameLibrary(lib, n);
-                }}
-                onCancel={() => setRenamingId(null)}
-                className="h-9 text-md"
-              />
-            </div>
-          ) : (
-            <ContextMenu key={lib.id}>
-              <ContextMenuTrigger render={<div className="contents" />}>
-                <LibraryNode lib={lib} loc={loc} onNavigate={onNavigate} />
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onClick={() => setRenamingId(lib.id)}>
-                  <Pencil className="size-4" /> 이름 변경
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          ),
-        )}
-      </section>
-      <div className="mt-auto">
-        <StorageCard />
-      </div>
+    <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pt-2 pb-2">
+      <div className="mb-1 px-2 pt-1 text-ui-xs font-medium text-muted-foreground">내 저장소</div>
+      {libraries?.map((lib) =>
+        lib.encrypted ? (
+          <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />
+        ) : renamingId === lib.id ? (
+          <div key={lib.id} className="my-px pl-6">
+            <InlineName
+              initial={lib.name}
+              existing={names.filter((n) => n !== lib.name)}
+              onSubmit={(n) => {
+                setRenamingId(null);
+                onRenameLibrary(lib, n);
+              }}
+              onCancel={() => setRenamingId(null)}
+              className="h-7 text-ui md:text-ui"
+            />
+          </div>
+        ) : (
+          <ContextMenu key={lib.id}>
+            <ContextMenuTrigger render={<div className="contents" />}>
+              <LibraryNode lib={lib} loc={loc} onNavigate={onNavigate} />
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => setRenamingId(lib.id)} className="text-ui">
+                <Pencil className="size-4" /> 이름 변경
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ),
+      )}
     </aside>
   );
 }
 
 function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; onNavigate(loc: Location): void }) {
   const active = loc.libId === lib.id;
-  const [open, setOpen] = useState<boolean | null>(null); // null = 사용자가 안 건드림 → 활성이면 펼침
+  const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? active;
   return (
     <>
@@ -90,19 +73,16 @@ function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; on
   );
 }
 
-/** 폴더 하위 목록. 본문과 같은 쿼리 키라 캐시를 공유한다. 시안의 세로 연결선 포함. */
 function DirChildren({ libId, path, depth, loc, onNavigate }: { libId: string; path: string; depth: number; loc: Location; onNavigate(loc: Location): void }) {
   const q = useCurrentDir({ libId, path });
   const dirs = q.data?.filter((e) => e.type === "dir") ?? [];
-  if (q.isLoading) return <div className="my-1 h-8 animate-pulse rounded-lg bg-sidebar-accent" style={{ marginLeft: depth * 20 + 8 }} />;
-  if (dirs.length === 0) return null;
+  if (q.isLoading) return <div className="my-1 h-5 animate-pulse rounded bg-sidebar-accent" style={{ marginLeft: depth * 16 + 24 }} />;
   return (
-    <div className="relative">
-      <span className="absolute top-1 bottom-2 w-px bg-foreground/12" style={{ left: depth * 20 - 2 }} />
+    <>
       {dirs.map((d) => (
         <DirNode key={d.path} libId={libId} path={d.path} name={d.name} depth={depth} loc={loc} onNavigate={onNavigate} />
       ))}
-    </div>
+    </>
   );
 }
 
@@ -113,72 +93,39 @@ function DirNode({ libId, path, name, depth, loc, onNavigate }: { libId: string;
   const expanded = open ?? ancestor;
   return (
     <>
-      <Row
-        depth={depth}
-        icon={<Folder className="size-4" />}
-        label={name}
-        selected={selected}
-        chevron={expanded ? "down" : "right"}
-        onChevron={() => setOpen(!expanded)}
-        onClick={() => onNavigate({ libId, path })}
-      />
+      <Row depth={depth} icon={<Folder className="size-4" />} label={name} selected={selected} chevron={expanded ? "down" : "right"} onChevron={() => setOpen(!expanded)} onClick={() => onNavigate({ libId, path })} />
       {expanded && <DirChildren libId={libId} path={path} depth={depth + 1} loc={loc} onNavigate={onNavigate} />}
     </>
   );
 }
 
-function Row({
-  depth,
-  icon,
-  label,
-  selected,
-  disabled,
-  title,
-  chevron,
-  onChevron,
-  onClick,
-}: {
-  depth: number;
-  icon: React.ReactNode;
-  label: string;
-  selected?: boolean;
-  disabled?: boolean;
-  title?: string;
-  chevron?: "down" | "right";
-  onChevron?(): void;
-  onClick?(): void;
-}) {
+function Row({ depth, icon, label, selected, disabled, title, chevron, onChevron, onClick }: { depth: number; icon: ReactNode; label: string; selected?: boolean; disabled?: boolean; title?: string; chevron?: "down" | "right"; onChevron?(): void; onClick?(): void }) {
   return (
-    <div className="relative my-0.5 flex items-center" style={{ paddingLeft: depth * 20 }}>
-      {chevron && (
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="absolute z-10 size-6 text-muted-foreground hover:bg-transparent"
-          style={{ left: depth * 20 + 6 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onChevron?.();
-          }}
-        >
-          {chevron === "down" ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-        </Button>
+    <div
+      role="treeitem"
+      aria-selected={selected}
+      title={title ?? label}
+      onClick={disabled ? undefined : onClick}
+      className={cn(
+        "my-px flex h-7 cursor-default items-center gap-1.5 rounded-md pr-2 text-ui text-foreground",
+        !disabled && !selected && "hover:bg-sidebar-accent",
+        selected && "bg-selection",
+        disabled && "text-muted-foreground",
       )}
-      <Button
-        variant="ghost"
-        disabled={disabled}
-        onClick={onClick}
-        title={title ?? label}
-        className={cn(
-          "h-10 w-full justify-start gap-2.5 rounded-[10px] pr-3 text-md font-normal text-foreground hover:bg-sidebar-accent",
-          chevron ? "pl-9" : "pl-3",
-          selected && "bg-card font-medium shadow-item hover:bg-card",
-          disabled && "text-muted-foreground",
-        )}
+      style={{ paddingLeft: depth * 16 + 4 }}
+    >
+      <span
+        className={cn("flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground", chevron && "hover:bg-accent")}
+        onClick={(e) => {
+          if (!chevron) return;
+          e.stopPropagation();
+          onChevron?.();
+        }}
       >
-        <span className="text-muted-foreground">{icon}</span>
-        <span className="truncate">{label}</span>
-      </Button>
+        {chevron === "down" ? <ChevronDown className="size-3.5" /> : chevron === "right" ? <ChevronRight className="size-3.5" /> : null}
+      </span>
+      <span className={cn("shrink-0", selected ? "text-primary" : "text-muted-foreground")}>{icon}</span>
+      <span className="truncate">{label}</span>
     </div>
   );
 }

@@ -31,18 +31,18 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-linear-to-b from-sidebar to-sidebar-bottom">
-      <form onSubmit={submit} className="flex w-88 flex-col gap-2 rounded-2xl border border-border bg-card p-8 shadow-float">
-        <h1 className="mb-4 text-xl font-semibold tracking-tight">Drive</h1>
-        <label className="text-xs text-muted-foreground">서버 주소</label>
+    <div className="flex h-screen items-center justify-center bg-sidebar">
+      <form onSubmit={submit} className="flex w-80 flex-col gap-2 rounded-lg border border-border bg-card p-6 text-ui shadow-item">
+        <h1 className="mb-3 text-lg font-semibold tracking-tight">Drive</h1>
+        <label className="text-ui-xs text-muted-foreground">서버 주소</label>
         <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." required />
-        <label className="text-xs text-muted-foreground">아이디</label>
+        <label className="text-ui-xs text-muted-foreground">아이디</label>
         <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
-        <label className="text-xs text-muted-foreground">비밀번호</label>
+        <label className="text-ui-xs text-muted-foreground">비밀번호</label>
         <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
         {otpRequired && (
           <>
-            <label className="text-xs text-muted-foreground">2단계 인증 코드</label>
+            <label className="text-ui-xs text-muted-foreground">2단계 인증 코드</label>
             <Input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" autoFocus />
           </>
         )}

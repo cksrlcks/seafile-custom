@@ -37,13 +37,13 @@ export function UploadPanel() {
   if (total === 0) return null;
 
   return (
-    <div className="absolute right-7 bottom-7 z-20 w-120 rounded-2xl border border-border bg-card text-sm shadow-float">
-      <div className="flex h-11 items-center gap-3 px-4">
+    <div className="absolute right-3 bottom-3 z-20 w-96 rounded-lg border border-border bg-popover text-ui shadow-float">
+      <div className="flex h-9 items-center gap-2.5 px-3">
         <span className="shrink-0 font-medium">
           업로드 {done}/{total}
         </span>
-        <Progress value={bytes ? (sent / bytes) * 100 : 0} className="w-48" />
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        <Progress value={bytes ? (sent / bytes) * 100 : 0} className="w-28" />
+        <span className="min-w-0 flex-1 truncate text-ui-xs text-muted-foreground">
           {current ? `${current.task.file.name}  ${formatSize(current.sent)} / ${formatSize(current.total)}` : allFinished ? "모두 완료" : ""}
         </span>
         <Button variant="ghost" size="icon-sm" onClick={() => setExpanded((v) => !v)} title={expanded ? "접기" : "펼치기"}>
@@ -62,7 +62,7 @@ export function UploadPanel() {
         </Button>
       </div>
       {expanded && (
-        <ul className="max-h-56 overflow-auto border-t border-border py-1">
+        <ul className="max-h-48 overflow-auto border-t border-border py-1">
           {items.map((i) => (
             <Row key={i.id} item={i} onRetry={() => queue.retry(i.id)} onCancel={() => queue.cancel(i.id)} />
           ))}
@@ -76,10 +76,10 @@ function Row({ item, onRetry, onCancel }: { item: UploadItem; onRetry(): void; o
   const name = item.task.relativePath ? `${item.task.relativePath}/${item.task.file.name}` : item.task.file.name;
   const pct = item.total ? (item.sent / item.total) * 100 : item.status === "done" ? 100 : 0;
   return (
-    <li className="flex h-9 items-center gap-3 px-4">
+    <li className="flex h-7 items-center gap-2 px-3 text-ui-sm">
       <span className="min-w-0 flex-1 truncate">{name}</span>
-      <Progress value={pct} className="w-32" />
-      <span className={item.status === "failed" ? "w-14 text-xs text-destructive" : "w-14 text-xs text-muted-foreground"} title={item.error}>
+      <Progress value={pct} className="w-20" />
+      <span className={item.status === "failed" ? "w-12 text-ui-xs text-destructive" : "w-12 text-ui-xs text-muted-foreground"} title={item.error}>
         {STATUS_LABEL[item.status]}
       </span>
       {(item.status === "failed" || item.status === "cancelled") && (
