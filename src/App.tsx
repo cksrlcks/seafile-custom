@@ -6,6 +6,7 @@ import { UploadQueueRoot } from "@/features/upload/useUploadQueue";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ErrorBoundary } from "@/features/shell/ErrorBoundary";
 
 function Gate() {
   const { session, onUnauthorized } = useSession();
@@ -34,10 +35,12 @@ function Gate() {
 
 export default function App() {
   return (
-    <StorageRoot>
-      <TooltipProvider delay={400}>
-        <Gate />
-      </TooltipProvider>
-    </StorageRoot>
+    <ErrorBoundary>
+      <StorageRoot>
+        <TooltipProvider delay={400}>
+          <Gate />
+        </TooltipProvider>
+      </StorageRoot>
+    </ErrorBoundary>
   );
 }

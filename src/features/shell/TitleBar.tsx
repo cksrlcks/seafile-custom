@@ -2,7 +2,7 @@ import { IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, Icon
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MenuBar, type MenuActions } from "./MenuBar";
@@ -99,10 +99,12 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
             <IconUser className="size-4" stroke={1.75} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-48">
-            <DropdownMenuLabel>
-              <div className="font-medium">{accountLabel}</div>
-              {accountSub && <div className="text-2xs font-normal text-muted-foreground">{accountSub}</div>}
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                <div className="font-medium">{accountLabel}</div>
+                {accountSub && <div className="text-2xs font-normal text-muted-foreground">{accountSub}</div>}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={m.logout}>
               <IconLogout className="size-4" stroke={1.75} /> 로그아웃
