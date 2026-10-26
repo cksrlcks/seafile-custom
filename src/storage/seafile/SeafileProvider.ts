@@ -1,9 +1,16 @@
 import type { Entry, Library, ShareLink, StorageProvider, UploadTask } from "../StorageProvider";
 import { joinPath } from "../path";
 import { SeafileApi } from "./api";
+import { CHUNK_SIZE, chunkRanges } from "./chunk";
+import { xhrUpload } from "./xhrUpload";
 
 interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean }
 interface DirentDto { id: string; name: string; type: "file" | "dir"; size?: number; mtime: number }
+
+function isLinkExpired(e: unknown): boolean {
+  const status = (e as { status?: number }).status;
+  return status === 403 || status === 500;
+}
 
 export class SeafileProvider implements StorageProvider {
   private _token: string | null;
@@ -48,9 +55,56 @@ export class SeafileProvider implements StorageProvider {
       .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
   }
 
-  upload(_libId: string, _task: UploadTask, _onProgress: (sent: number, total: number) => void, _signal?: AbortSignal): Promise<void> {
-    throw new Error("not implemented");
+  async upload(libId: string, task: UploadTask, onProgress: (sent: number, total: number) => void, signal?: AbortSignal): Promise<void> {
+    const { file, targetDir, relativePath } = task;
+    const dir = relativePath ? joinPath(targetDir, relativePath) : targetDir;
+    const size = file.size;
+
+    const uploaded = await this.api
+      .get<{ uploadedBytes: number }>(`/api/v2.1/repos/${libId}/file-uploaded-bytes/`, { parent_dir: dir, file_name: file.name })
+      .then((r) => r.uploadedBytes ?? 0)
+      .catch(() => 0);
+    if (size > 0 && uploaded >= size) {
+      onProgress(size, size);
+      return;
+    }
+
+    let link = await this.uploadLink(libId, targetDir);
+    const form = (blob: Blob) => {
+      const f = new FormData();
+      f.append("file", blob, file.name);
+      f.append("parent_dir", targetDir);
+      if (relativePath) f.append("relative_path", relativePath);
+      f.append("replace", "1");
+      return f;
+    };
+
+    const ranges = chunkRanges(size, uploaded, CHUNK_SIZE);
+    if (ranges.length === 0) {
+      await xhrUpload(link, form(file), {}, (sent) => onProgress(sent, size), signal);
+      onProgress(size, size);
+      return;
+    }
+    for (const { start, end } of ranges) {
+      const headers = { "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Disposition": `attachment; filename="${file.name}"` };
+      const send = () => xhrUpload(link, form(file.slice(start, end + 1)), headers, (sent) => onProgress(start + sent, size), signal);
+      try {
+        await send();
+      } catch (e) {
+        // 업로드 링크 만료(403/500) → 링크 한 번 다시 받아 같은 청크 재시도
+        if (signal?.aborted || !isLinkExpired(e)) throw e;
+        link = await this.uploadLink(libId, targetDir);
+        await send();
+      }
+      onProgress(end + 1, size);
+    }
   }
+
+  private async uploadLink(libId: string, dir: string): Promise<string> {
+    const url = await this.api.get<string>(`/api2/repos/${libId}/upload-link/`, { p: dir });
+    return `${url}?ret-json=1`;
+  }
+
   downloadUrl(_libId: string, _path: string): Promise<string> {
     throw new Error("not implemented");
   }
