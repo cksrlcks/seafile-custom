@@ -1,0 +1,11 @@
+- generic [ref=f1e3]:
+  - complementary [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e11]: seadrive
+      - button "사이드바 접기" [ref=f1e12]
+    - generic [ref=f1e13]: 라이브러리
+  - main [ref=f1e16]:
+    - generic [ref=f1e17]:
+      - generic [ref=f1e22]: 라이브러리
+      - button "mock" [ref=f1e23]
+    - generic [ref=f1e25]: 라이브러리를 선택하세요

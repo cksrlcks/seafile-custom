@@ -13,8 +13,8 @@ export class SeafileApi {
     return query ? `${u}?${new URLSearchParams(query)}` : u;
   }
 
-  async get<T>(path: string, query?: Query): Promise<T> {
-    return this.request<T>("GET", path, query);
+  async get<T>(path: string, query?: Query, signal?: AbortSignal): Promise<T> {
+    return this.request<T>("GET", path, query, undefined, undefined, signal);
   }
 
   async postForm<T>(path: string, form: Record<string, string>, query?: Query, headers?: Query): Promise<T> {
@@ -25,7 +25,7 @@ export class SeafileApi {
     await this.request<unknown>("DELETE", path, query);
   }
 
-  private async request<T>(method: string, path: string, query?: Query, body?: BodyInit, extra?: Query): Promise<T> {
+  private async request<T>(method: string, path: string, query?: Query, body?: BodyInit, extra?: Query, signal?: AbortSignal): Promise<T> {
     const headers = new Headers(extra);
     const token = this.getToken();
     if (token) headers.set("Authorization", `Token ${token}`);
@@ -33,8 +33,9 @@ export class SeafileApi {
 
     let res: Response;
     try {
-      res = await fetch(this.url(path, query), { method, headers, body });
+      res = await fetch(this.url(path, query), { method, headers, body, signal });
     } catch (e) {
+      if ((e as Error).name === "AbortError") throw e;
       throw new StorageError("network", (e as Error).message);
     }
     if (!res.ok) {

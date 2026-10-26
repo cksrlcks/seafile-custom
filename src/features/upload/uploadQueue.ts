@@ -1,5 +1,5 @@
-import { joinPath } from "@/storage/path";
-import type { StorageProvider, UploadTask } from "@/storage/StorageProvider";
+import { joinPath, parentPath } from "@/storage/path";
+import { StorageError, type StorageProvider, type UploadTask } from "@/storage/StorageProvider";
 
 export type UploadStatus = "queued" | "uploading" | "done" | "failed" | "cancelled";
 
@@ -28,6 +28,8 @@ export class UploadQueue {
   private readonly concurrency: number;
   private readonly retries: number;
   onAllDone?: (libId: string, dirs: Set<string>) => void;
+  /** 401: 재시도하지 않고 즉시 실패시킨 뒤 알린다 */
+  onUnauthorized?: () => void;
   private pendingDirs = new Map<string, Set<string>>();
 
   constructor(
@@ -42,7 +44,13 @@ export class UploadQueue {
     for (const task of tasks) {
       this.items.push({ id: String(++this.seq), task, libId, status: "queued", sent: 0, total: task.file.size, attempts: 0 });
       const dirs = this.pendingDirs.get(libId) ?? new Set<string>();
-      dirs.add(task.relativePath ? joinPath(task.targetDir, task.relativePath) : task.targetDir);
+      // 잎 경로부터 targetDir까지 모든 조상: 폴더 드롭 시 보고 있던 폴더와 중간 폴더도 갱신돼야 한다
+      let d = task.relativePath ? joinPath(task.targetDir, task.relativePath) : task.targetDir;
+      for (;;) {
+        dirs.add(d);
+        if (d === task.targetDir || d === "/") break;
+        d = parentPath(d);
+      }
       this.pendingDirs.set(libId, dirs);
     }
     this.emit();
@@ -72,14 +80,12 @@ export class UploadQueue {
     this.emit();
   }
 
-  subscribe(fn: (items: UploadItem[]) => void): () => void {
+  subscribe = (fn: (items: UploadItem[]) => void): (() => void) => {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);
-  }
+  };
 
-  getSnapshot(): UploadItem[] {
-    return this.items;
-  }
+  getSnapshot = (): UploadItem[] => this.items;
 
   private find(id: string) {
     return this.items.find((i) => i.id === id);
@@ -114,8 +120,12 @@ export class UploadQueue {
       this.update(id, { status: "done", sent: item.total });
     } catch (e) {
       const cur = this.find(id)!;
+      const unauthorized = e instanceof StorageError && e.kind === "unauthorized";
       if (ctrl.signal.aborted) this.update(id, { status: "cancelled" });
-      else if (cur.attempts <= this.retries) this.update(id, { status: "queued" });
+      else if (unauthorized) {
+        this.update(id, { status: "failed", error: "로그인이 필요합니다" });
+        this.onUnauthorized?.();
+      } else if (cur.attempts <= this.retries) this.update(id, { status: "queued", sent: 0 });
       else this.update(id, { status: "failed", error: (e as Error).message });
     } finally {
       this.controllers.delete(id);

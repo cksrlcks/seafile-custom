@@ -92,7 +92,12 @@ export function MainScreen() {
     });
   }
   function toggleAll(paths: string[]) {
-    setSelected((s) => (paths.every((p) => s.has(p)) ? new Set() : new Set(paths)));
+    setSelected((s) => {
+      const n = new Set(s);
+      if (paths.every((p) => n.has(p))) paths.forEach((p) => n.delete(p));
+      else paths.forEach((p) => n.add(p));
+      return n;
+    });
   }
   function onSort(key: SortKey) {
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
@@ -103,27 +108,28 @@ export function MainScreen() {
     <div className="flex h-screen bg-background text-foreground">
       {sidebarOpen && <Sidebar libraries={libs.data} loc={loc} onNavigate={setLoc} onCollapse={() => setSidebarOpen(false)} />}
 
-      <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-0">
-        <main className={cn("flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm", !sidebarOpen && "ml-3")}>
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
           {libs.error && <ErrorBanner message="라이브러리 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
 
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-6">
+          {/* 시안 실측: 브레드크럼 바 84px, 15px 회색, 문서 아이콘 */}
+          <div className="flex h-21 shrink-0 items-center gap-2.5 border-b border-border px-7">
             {!sidebarOpen && (
               <Button variant="ghost" size="icon-sm" onClick={() => setSidebarOpen(true)} title="사이드바 펼치기" className="-ml-2 text-muted-foreground">
-                <PanelLeft className="size-4" />
+                <PanelLeft className="size-4.5" />
               </Button>
             )}
-            <FileStack className="size-4 text-muted-foreground" />
+            <FileStack className="size-4.5 text-muted-foreground" />
             {loc.libId ? (
               <Breadcrumb libName={libName} path={loc.path} onNavigate={(path) => setLoc({ ...loc, path })} />
             ) : (
-              <span className="text-sm text-muted-foreground">라이브러리</span>
+              <span className="text-md text-muted-foreground">라이브러리</span>
             )}
             <div className="flex-1" />
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="text-muted-foreground" />}>
                 <User className="size-4" />
-                <span className="max-w-48 truncate text-xs">{session.connection.baseUrl.replace(/^https?:\/\//, "")}</span>
+                <span className="max-w-48 truncate text-caption">{session.connection.baseUrl.replace(/^https?:\/\//, "")}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={logout}>
@@ -137,40 +143,42 @@ export function MainScreen() {
             <Empty text="라이브러리를 선택하세요" />
           ) : (
             <>
-              <div className="flex h-16 shrink-0 items-center gap-4 border-b border-border px-6">
-                <h1 className="min-w-0 truncate text-xl font-semibold">{title}</h1>
-                <span className="h-6 w-px bg-border" />
-                <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-1">
-                  <Button variant="ghost" size="sm" onClick={() => setView("list")} className={cn("rounded-lg font-normal text-muted-foreground", view === "list" && "bg-card text-foreground shadow-sm hover:bg-card")}>
-                    <List className="size-4" /> 목록
+              {/* 시안 실측: 제목 바 66px, 제목 20px, 세로 구분선, 활성 항목만 연회색 칩(44px, r=10) */}
+              <div className="flex h-17 shrink-0 items-center gap-4 border-b border-border px-7">
+                <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">{title}</h1>
+                <span className="h-5.5 w-px bg-border" />
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" onClick={() => setView("list")} className={cn("h-11 gap-2 rounded-[10px] px-4 text-md font-normal text-muted-foreground hover:bg-secondary", view === "list" && "bg-secondary text-foreground")}>
+                    <List className="size-4.5" /> 목록
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setView("grid")} className={cn("rounded-lg font-normal text-muted-foreground", view === "grid" && "bg-card text-foreground shadow-sm hover:bg-card")}>
-                    <LayoutGrid className="size-4" /> 그리드
+                  <Button variant="ghost" onClick={() => setView("grid")} className={cn("h-11 gap-2 rounded-[10px] px-4 text-md font-normal text-muted-foreground hover:bg-secondary", view === "grid" && "bg-secondary text-foreground")}>
+                    <LayoutGrid className="size-4.5" /> 그리드
                   </Button>
                 </div>
                 <div className="flex-1" />
                 {selectedEntries.length > 0 && (
                   <>
-                    <span className="text-sm text-muted-foreground">{selectedEntries.length}개 선택</span>
-                    <Button variant="outline" size="sm" onClick={() => setDeleting(selectedEntries)}>
+                    <span className="text-md text-muted-foreground">{selectedEntries.length}개 선택</span>
+                    <Button variant="outline" className="h-10 rounded-[10px] text-md font-normal" onClick={() => setDeleting(selectedEntries)}>
                       <Trash2 className="size-4" /> 삭제
                     </Button>
-                    <span className="h-6 w-px bg-border" />
+                    <span className="h-5.5 w-px bg-border" />
                   </>
                 )}
-                <Button variant="ghost" size="icon-sm" title="새로고침" className="text-muted-foreground" onClick={() => qc.invalidateQueries({ queryKey: ["dir"] })}>
-                  <RefreshCw className="size-4" />
+                <Button variant="ghost" size="icon" title="새로고침" className="rounded-[10px] text-muted-foreground" onClick={() => qc.invalidateQueries({ queryKey: ["dir"] })}>
+                  <RefreshCw className="size-4.5" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setCreatingFolder(true)}>
-                  <FolderPlus className="size-4" /> 새 폴더
+                <Button variant="outline" className="h-10 rounded-[10px] text-md font-normal" onClick={() => setCreatingFolder(true)}>
+                  <FolderPlus className="size-4.5" /> 새 폴더
                 </Button>
-                <Button size="sm" onClick={() => dropRef.current?.open()}>
-                  <Upload className="size-4" /> 업로드
+                <Button className="h-10 rounded-[10px] text-md" onClick={() => dropRef.current?.open()}>
+                  <Upload className="size-4.5" /> 업로드
                 </Button>
               </div>
               <div className="relative flex min-h-0 flex-1 flex-col overflow-auto">
                 <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
                   {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
+                  {ops.error && <ErrorBanner message={`${ops.error.message} (${ops.error.detail})`} actionLabel="닫기" onRetry={ops.error.reset} />}
                   {dir.isLoading ? (
                     <FileTableSkeleton />
                   ) : dir.data && dir.data.length === 0 && !creatingFolder ? (
@@ -187,6 +195,7 @@ export function MainScreen() {
                       onOpenDir={(path) => setLoc({ ...loc, path })}
                       onOpenFile={openFile}
                       actions={menuActions}
+                      existingNames={(dir.data ?? []).map((e) => e.name)}
                       renamingPath={renamingPath}
                       onRenameSubmit={(entry, newName) => {
                         setRenamingPath(null);
@@ -235,15 +244,15 @@ export function MainScreen() {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{text}</div>;
+  return <div className="flex flex-1 items-center justify-center text-md text-muted-foreground">{text}</div>;
 }
 
-function ErrorBanner({ message, onRetry }: { message: string; onRetry(): void }) {
+function ErrorBanner({ message, onRetry, actionLabel = "다시 시도" }: { message: string; onRetry(): void; actionLabel?: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      <span>{message}</span>
+    <div className="flex items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-6 py-2.5 text-sm text-destructive">
+      <span className="truncate">{message}</span>
       <Button variant="outline" size="sm" onClick={onRetry}>
-        다시 시도
+        {actionLabel}
       </Button>
     </div>
   );

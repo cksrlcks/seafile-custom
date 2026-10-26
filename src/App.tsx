@@ -1,4 +1,4 @@
-import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { MainScreen } from "@/features/browse/MainScreen";
@@ -8,17 +8,19 @@ import { StorageRoot, useSession } from "@/storage/StorageContext";
 
 function Gate() {
   const { session, onUnauthorized } = useSession();
+  const onError = (e: unknown) => {
+    if (e instanceof StorageError && e.kind === "unauthorized") onUnauthorized();
+  };
+  // 세션(서버·토큰)이 바뀌면 캐시도 새로: 다른 계정의 목록이 남지 않게
   const client = useMemo(
     () =>
       new QueryClient({
-        queryCache: new QueryCache({
-          onError: (e) => {
-            if (e instanceof StorageError && e.kind === "unauthorized") onUnauthorized();
-          },
-        }),
+        queryCache: new QueryCache({ onError }),
+        mutationCache: new MutationCache({ onError }),
         defaultOptions: { queries: { retry: false, staleTime: 10_000 } },
       }),
-    [onUnauthorized],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onUnauthorized, session.connection.baseUrl, session.token],
   );
   return <QueryClientProvider client={client}>{session.token ? (
         <UploadQueueRoot>

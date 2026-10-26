@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { formatSize } from "@/lib/format";
@@ -77,6 +77,25 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
     queryFn: () => storage.previewUrl(libId, entry.path),
     enabled: kind === "image" || kind === "pdf",
   });
+  // PDF: 다운로드 링크는 attachment 헤더가 붙어 iframe이 저장을 시작하므로 blob으로 받아 띄운다
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState(false);
+  useEffect(() => {
+    if (kind !== "pdf" || !url.data) return;
+    let objectUrl: string | null = null;
+    const ctrl = new AbortController();
+    fetch(url.data, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.statusText))))
+      .then((b) => {
+        objectUrl = URL.createObjectURL(b.type === "application/pdf" ? b : new Blob([b], { type: "application/pdf" }));
+        setPdfUrl(objectUrl);
+      })
+      .catch((e) => e.name !== "AbortError" && setPdfError(true));
+    return () => {
+      ctrl.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [kind, url.data]);
   const text = useQuery({
     queryKey: ["text", libId, entry.path],
     queryFn: () => storage.readText(libId, entry.path),
@@ -91,9 +110,9 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
         </Button>
       </Fallback>
     );
-  if (url.error || text.error) return <Fallback message="불러오지 못했습니다" />;
+  if (url.error || text.error || pdfError) return <Fallback message="불러오지 못했습니다" />;
   if (kind === "image") return url.data ? <img src={url.data} alt={entry.name} className="max-h-full max-w-full object-contain" /> : <Loading />;
-  if (kind === "pdf") return url.data ? <iframe src={url.data} title={entry.name} className="h-full w-full bg-card" /> : <Loading />;
+  if (kind === "pdf") return pdfUrl ? <iframe src={pdfUrl} title={entry.name} className="h-full w-full bg-card" /> : <Loading />;
   if (kind === "text")
     return text.data !== undefined ? (
       <pre className="h-full w-full overflow-auto bg-card p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap">{text.data}</pre>

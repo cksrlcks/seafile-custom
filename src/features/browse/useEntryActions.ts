@@ -4,6 +4,24 @@ import { joinPath, parentPath } from "@/storage/path";
 import type { Entry } from "@/storage/StorageProvider";
 import type { Location } from "./useCurrentDir";
 
+const isTauri = () => "__TAURI_INTERNALS__" in window;
+
+/** Tauri WebView2의 window.open은 다운로드를 보장하지 않아 시스템 브라우저로 넘긴다. 브라우저 모드는 <a download>. */
+async function openDownload(url: string, name: string) {
+  if (isTauri()) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 export function useEntryActions(loc: Location) {
   const storage = useStorage();
   const qc = useQueryClient();
@@ -23,11 +41,12 @@ export function useEntryActions(loc: Location) {
     onSuccess: (_d, entry) => refresh(parentPath(entry.path)),
   });
   const download = useMutation({
-    mutationFn: async (entry: Entry) => {
-      const url = await storage.downloadUrl(libId, entry.path);
-      window.open(url, "_blank");
-    },
+    mutationFn: async (entry: Entry) => openDownload(await storage.downloadUrl(libId, entry.path), entry.name),
   });
 
-  return { mkdir, rename, remove, download };
+  const labels = { mkdir: "새 폴더를 만들지 못했습니다", rename: "이름을 바꾸지 못했습니다", remove: "삭제하지 못했습니다", download: "다운로드 링크를 받지 못했습니다" };
+  const failed = ([["mkdir", mkdir], ["rename", rename], ["remove", remove], ["download", download]] as const).find(([, m]) => m.error);
+  const error = failed ? { message: labels[failed[0]], detail: (failed[1].error as Error).message, reset: () => failed[1].reset() } : null;
+
+  return { mkdir, rename, remove, download, error };
 }

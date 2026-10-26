@@ -27,6 +27,8 @@ interface Props {
   onOpenDir(path: string): void;
   onOpenFile(entry: Entry): void;
   actions: EntryMenuActions;
+  /** 현재 폴더의 이름들 (이름 변경·새 폴더 중복 검사) */
+  existingNames: string[];
   renamingPath: string | null;
   onRenameSubmit(entry: Entry, newName: string): void;
   onRenameCancel(): void;
@@ -56,6 +58,7 @@ export function FileTable(p: Props) {
         onToggle={() => p.onToggle(e.path)}
         onOpen={open}
         renaming={p.renamingPath === e.path}
+        existingNames={p.existingNames}
         onRenameSubmit={(n) => p.onRenameSubmit(e, n)}
         onRenameCancel={p.onRenameCancel}
       />
@@ -63,17 +66,17 @@ export function FileTable(p: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-8 p-7">
+    <div className="flex flex-col gap-8 px-7 pt-8 pb-10">
       {showDirs && (
         <section className="flex flex-col gap-4">
           <SectionTitle label="폴더" count={dirs.length} />
           <div className="flex flex-wrap gap-5">
             {p.creatingFolder && (
-              <div className="flex w-58 flex-col gap-3 rounded-2xl border border-dashed border-primary bg-card p-2 pb-4">
-                <div className="flex h-36 items-center justify-center rounded-xl bg-muted/60">
-                  <FolderGlyph className="size-22" />
+              <div className="flex w-58 flex-col rounded-2xl border border-dashed border-primary/60 bg-card p-2 pb-5">
+                <div className="flex h-34 items-center justify-center rounded-xl bg-muted">
+                  <FolderGlyph className="size-24" />
                 </div>
-                <InlineName initial="새 폴더" onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="mx-2 h-8 text-center text-sm" />
+                <div className="mx-2 mt-5"><InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-8 text-center text-md" /></div>
               </div>
             )}
             {dirs.map((d) => card(d, () => p.onOpenDir(d.path)))}
@@ -89,14 +92,14 @@ export function FileTable(p: Props) {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
               <table className="w-full table-fixed border-collapse text-md">
-                <thead className="bg-muted/40 text-sm text-muted-foreground">
-                  <tr className="h-13 border-b border-border">
-                    <th className="w-14 pl-5">
+                <thead className="bg-surface-header text-md text-muted-foreground">
+                  <tr className="h-14 border-b border-border">
+                    <th className="w-13 pl-7">
                       <Checkbox
                         checked={files.length > 0 && files.every((f) => p.selected.has(f.path))}
                         indeterminate={files.some((f) => p.selected.has(f.path)) && !files.every((f) => p.selected.has(f.path))}
                         onCheckedChange={() => p.onToggleAll(files.map((f) => f.path))}
-                        className="size-5 rounded-md data-checked:border-foreground data-checked:bg-foreground data-indeterminate:border-foreground data-indeterminate:bg-foreground data-indeterminate:text-background"
+                        className="size-4.5 rounded-[5px] border-input bg-card data-checked:border-foreground data-checked:bg-foreground data-indeterminate:border-foreground data-indeterminate:bg-foreground data-indeterminate:text-background"
                       />
                     </th>
                     <SortHeader label="파일 이름" k="name" sort={p.sort} onSort={p.onSort} />
@@ -107,27 +110,27 @@ export function FileTable(p: Props) {
                 <tbody>
                   {files.map((e) => (
                     <EntryContextMenu key={e.path} entry={e} actions={p.actions} asRow selected={p.selected.has(e.path)}>
-                      <td className="pl-5" onClick={(e) => e.stopPropagation()}>
+                      <td className="pl-7" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={p.selected.has(e.path)}
                           onCheckedChange={() => p.onToggle(e.path)}
-                          className="size-5 rounded-md data-checked:border-foreground data-checked:bg-foreground"
+                          className="size-4.5 rounded-[5px] border-input bg-card data-checked:border-foreground data-checked:bg-foreground"
                         />
                       </td>
                       <td className="px-2" onDoubleClick={() => p.renamingPath !== e.path && p.onOpenFile(e)}>
                         <span className="flex items-center gap-3">
                           <FileIcon name={e.name} />
                           {p.renamingPath === e.path ? (
-                            <InlineName initial={e.name} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-8 max-w-md" />
+                            <InlineName initial={e.name} existing={p.existingNames} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-8 max-w-md" />
                           ) : (
                             <span className="truncate">{e.name}</span>
                           )}
                         </span>
                       </td>
-                      <td className="px-2 text-foreground/80" onDoubleClick={() => p.onOpenFile(e)}>
+                      <td className="px-2 text-foreground" onDoubleClick={() => p.onOpenFile(e)}>
                         {formatDateLong(e.mtime)}
                       </td>
-                      <td className="px-2 text-foreground/80" onDoubleClick={() => p.onOpenFile(e)}>
+                      <td className="px-2 text-foreground" onDoubleClick={() => p.onOpenFile(e)}>
                         {formatSize(e.size)}
                       </td>
                     </EntryContextMenu>
@@ -144,8 +147,8 @@ export function FileTable(p: Props) {
 
 function SectionTitle({ label, count }: { label: string; count: number }) {
   return (
-    <h2 className="text-lg font-semibold">
-      {label} <span className="font-normal text-muted-foreground">{count}</span>
+    <h2 className="text-lg font-semibold tracking-tight">
+      {label} <span className="ml-0.5 font-medium text-muted-foreground">{count}</span>
     </h2>
   );
 }
@@ -155,8 +158,8 @@ function SortHeader({ label, k, sort, onSort, className }: { label: string; k: S
   const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
   return (
     <th className={cn("text-left font-normal", className)}>
-      <Button variant="ghost" size="sm" onClick={() => onSort(k)} className={cn("-ml-2 gap-1.5 font-normal text-muted-foreground", active && "text-foreground")}>
-        {label} <Icon className="size-3.5" />
+      <Button variant="ghost" size="sm" onClick={() => onSort(k)} className={cn("-ml-2.5 gap-1.5 text-md font-normal text-muted-foreground hover:bg-transparent", active && "text-foreground")}>
+        {label} <Icon className="size-3.5 text-muted-foreground" />
       </Button>
     </th>
   );

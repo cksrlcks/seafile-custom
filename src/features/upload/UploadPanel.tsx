@@ -37,7 +37,7 @@ export function UploadPanel() {
   if (total === 0) return null;
 
   return (
-    <div className="mt-3 shrink-0 rounded-2xl border border-border bg-card text-sm shadow-sm">
+    <div className="absolute right-7 bottom-7 z-20 w-120 rounded-2xl border border-border bg-card text-sm shadow-float">
       <div className="flex h-11 items-center gap-3 px-4">
         <span className="shrink-0 font-medium">
           업로드 {done}/{total}

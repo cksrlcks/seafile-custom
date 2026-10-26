@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StorageProvider, UploadTask } from "@/storage/StorageProvider";
+import { StorageError, type StorageProvider, type UploadTask } from "@/storage/StorageProvider";
 import { UploadQueue } from "./uploadQueue";
 
 type Deferred = { resolve(): void; reject(e: Error): void; onProgress(sent: number, total: number): void; signal?: AbortSignal };
@@ -80,6 +80,32 @@ describe("UploadQueue", () => {
     expect(done).toHaveBeenCalledTimes(1);
     expect(done.mock.calls[0][0]).toBe("lib");
     expect([...done.mock.calls[0][1]].sort()).toEqual(["/d", "/d/sub"]);
+  });
+
+  it("invalidates every ancestor dir for a nested relativePath", async () => {
+    const { provider, calls } = fakeProvider();
+    const q = new UploadQueue(provider);
+    const done = vi.fn();
+    q.onAllDone = done;
+    q.add("lib", [{ ...task("x"), targetDir: "/", relativePath: "a/b" }]);
+    await tick();
+    calls[0].resolve();
+    await tick();
+    expect([...done.mock.calls[0][1]].sort()).toEqual(["/", "/a", "/a/b"]);
+  });
+
+  it("unauthorized fails immediately without retry and notifies", async () => {
+    const { provider, calls, upload } = fakeProvider();
+    const q = new UploadQueue(provider, { retries: 2 });
+    const onUnauthorized = vi.fn();
+    q.onUnauthorized = onUnauthorized;
+    q.add("lib", [task("a")]);
+    await tick();
+    calls[0].reject(new StorageError("unauthorized", "401", 401));
+    await tick();
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(q.getSnapshot()[0].status).toBe("failed");
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
   it("retry re-queues a failed item", async () => {

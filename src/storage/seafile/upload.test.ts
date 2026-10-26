@@ -4,6 +4,7 @@ vi.mock("./xhrUpload", () => ({ xhrUpload: vi.fn(async () => "ok") }));
 vi.mock("./chunk", async (orig) => ({ ...(await orig<typeof import("./chunk")>()), CHUNK_SIZE: 8 }));
 
 import { SeafileProvider } from "./SeafileProvider";
+import { markInterrupted, clearInterrupted } from "./resumeRegistry";
 import { xhrUpload } from "./xhrUpload";
 
 const fetchMock = vi.fn();
@@ -18,8 +19,8 @@ function server(uploadedBytes: number) {
   });
 }
 
-function fileOf(bytes: number): File {
-  return new File([new Uint8Array(bytes)], "big.bin");
+function fileOf(bytes: number, name = "big.bin"): File {
+  return new File([new Uint8Array(bytes)], name, { lastModified: 1_700_000_000_000 });
 }
 
 const p = () => new SeafileProvider("https://host.example", "t");
@@ -40,26 +41,64 @@ describe("SeafileProvider.upload", () => {
     expect(form.get("replace")).toBe("1");
   });
 
-  it("resumes from uploadedBytes", async () => {
+  it("resumes from uploadedBytes when the file was interrupted before", async () => {
     server(8);
-    await p().upload("r", { file: fileOf(20), targetDir: "/d" }, () => {});
+    const f = fileOf(20);
+    markInterrupted(f);
+    await p().upload("r", { file: f, targetDir: "/d" }, () => {});
     expect(xhr).toHaveBeenCalledTimes(2);
     expect(headersOf(0)["Content-Range"]).toBe("bytes 8-15/20");
     expect(headersOf(1)["Content-Range"]).toBe("bytes 16-19/20");
     expect(headersOf(0)["Content-Disposition"]).toBe('attachment; filename="big.bin"');
   });
 
-  it("skips when already complete", async () => {
+  it("starts from zero when the file was never interrupted, even if server has bytes", async () => {
+    server(8);
+    const f = fileOf(20);
+    clearInterrupted(f);
+    await p().upload("r", { file: f, targetDir: "/d" }, () => {});
+    expect(xhr).toHaveBeenCalledTimes(3);
+    expect(headersOf(0)["Content-Range"]).toBe("bytes 0-7/20");
+    expect(fetchMock.mock.calls.some((c) => (c[0] as string).includes("file-uploaded-bytes"))).toBe(false);
+  });
+
+  it("restarts from zero when server reports the full size (stale temp)", async () => {
     server(20);
-    const progress = vi.fn();
-    await p().upload("r", { file: fileOf(20), targetDir: "/d" }, progress);
+    const f = fileOf(20);
+    markInterrupted(f);
+    await p().upload("r", { file: f, targetDir: "/d" }, () => {});
+    expect(xhr).toHaveBeenCalledTimes(3);
+    expect(headersOf(0)["Content-Range"]).toBe("bytes 0-7/20");
+  });
+
+  it("clears the interrupted mark after success and sets it while chunking", async () => {
+    server(0);
+    const f = fileOf(20);
+    await p().upload("r", { file: f, targetDir: "/d" }, () => {});
+    const { isInterrupted } = await import("./resumeRegistry");
+    expect(isInterrupted(f)).toBe(false);
+  });
+
+  it("encodes non-latin filename in Content-Disposition", async () => {
+    server(0);
+    await p().upload("r", { file: fileOf(20, "회의 녹화.mp4"), targetDir: "/d" }, () => {});
+    expect(headersOf(0)["Content-Disposition"]).toBe('attachment; filename="%ED%9A%8C%EC%9D%98%20%EB%85%B9%ED%99%94.mp4"');
+  });
+
+  it("does not start when the signal is already aborted", async () => {
+    server(0);
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const err = await p().upload("r", { file: fileOf(5), targetDir: "/d" }, () => {}, ctrl.signal).catch((e) => e);
+    expect((err as Error).name).toBe("AbortError");
     expect(xhr).not.toHaveBeenCalled();
-    expect(progress).toHaveBeenCalledWith(20, 20);
   });
 
   it("asks uploaded bytes under the relative dir", async () => {
     server(0);
-    await p().upload("r", { file: fileOf(5), targetDir: "/d", relativePath: "a/b" }, () => {});
+    const f = fileOf(5);
+    markInterrupted(f);
+    await p().upload("r", { file: f, targetDir: "/d", relativePath: "a/b" }, () => {});
     const askUrl = fetchMock.mock.calls.find((c) => (c[0] as string).includes("file-uploaded-bytes"))![0] as string;
     expect(askUrl).toContain("parent_dir=%2Fd%2Fa%2Fb");
     expect((xhr.mock.calls[0][1] as FormData).get("relative_path")).toBe("a/b");

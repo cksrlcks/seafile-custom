@@ -2,6 +2,7 @@ import { StorageError, type Entry, type Library, type ShareLink, type StoragePro
 import { joinPath } from "../path";
 import { SeafileApi } from "./api";
 import { CHUNK_SIZE, chunkRanges } from "./chunk";
+import { clearInterrupted, isInterrupted, markInterrupted } from "./resumeRegistry";
 import { xhrUpload } from "./xhrUpload";
 
 interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean }
@@ -59,17 +60,26 @@ export class SeafileProvider implements StorageProvider {
     const { file, targetDir, relativePath } = task;
     const dir = relativePath ? joinPath(targetDir, relativePath) : targetDir;
     const size = file.size;
+    const throwIfAborted = () => {
+      if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+    };
+    throwIfAborted();
 
-    const uploaded = await this.api
-      .get<{ uploadedBytes: number }>(`/api/v2.1/repos/${libId}/file-uploaded-bytes/`, { parent_dir: dir, file_name: file.name })
-      .then((r) => r.uploadedBytes ?? 0)
-      .catch(() => 0);
-    if (size > 0 && uploaded >= size) {
-      onProgress(size, size);
-      return;
+    // 이어올리기: 이 앱이 중단한 파일만. 서버 temp가 파일 전체 크기 이상이면 커밋 안 된 옛 temp로 보고 처음부터.
+    let uploaded = 0;
+    if (isInterrupted(file)) {
+      uploaded = await this.api
+        .get<{ uploadedBytes: number }>(`/api/v2.1/repos/${libId}/file-uploaded-bytes/`, { parent_dir: dir, file_name: file.name }, signal)
+        .then((r) => r.uploadedBytes ?? 0)
+        .catch((e) => {
+          if ((e as Error).name === "AbortError") throw e;
+          return 0;
+        });
+      if (uploaded >= size) uploaded = 0;
     }
+    throwIfAborted();
 
-    let link = await this.uploadLink(libId, targetDir);
+    let link = await this.uploadLink(libId, targetDir, signal);
     const form = (blob: Blob) => {
       const f = new FormData();
       f.append("file", blob, file.name);
@@ -78,30 +88,36 @@ export class SeafileProvider implements StorageProvider {
       f.append("replace", "1");
       return f;
     };
+    const progress = (sent: number) => onProgress(Math.min(sent, size), size);
 
     const ranges = chunkRanges(size, uploaded, CHUNK_SIZE);
     if (ranges.length === 0) {
-      await xhrUpload(link, form(file), {}, (sent) => onProgress(sent, size), signal);
+      await xhrUpload(link, form(file), {}, progress, signal);
       onProgress(size, size);
       return;
     }
+    markInterrupted(file);
+    // XHR 헤더는 ISO-8859-1만 허용 → 파일명은 percent-encoding (Seahub resumable과 동일)
+    const disposition = `attachment; filename="${encodeURIComponent(file.name)}"`;
     for (const { start, end } of ranges) {
-      const headers = { "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Disposition": `attachment; filename="${file.name}"` };
-      const send = () => xhrUpload(link, form(file.slice(start, end + 1)), headers, (sent) => onProgress(start + sent, size), signal);
+      throwIfAborted();
+      const headers = { "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Disposition": disposition };
+      const send = () => xhrUpload(link, form(file.slice(start, end + 1)), headers, (sent) => progress(start + sent), signal);
       try {
         await send();
       } catch (e) {
         // 업로드 링크 만료(403/500) → 링크 한 번 다시 받아 같은 청크 재시도
         if (signal?.aborted || !isLinkExpired(e)) throw e;
-        link = await this.uploadLink(libId, targetDir);
+        link = await this.uploadLink(libId, targetDir, signal);
         await send();
       }
-      onProgress(end + 1, size);
+      progress(end + 1);
     }
+    clearInterrupted(file);
   }
 
-  private async uploadLink(libId: string, dir: string): Promise<string> {
-    const url = await this.api.get<string>(`/api2/repos/${libId}/upload-link/`, { p: dir });
+  private async uploadLink(libId: string, dir: string, signal?: AbortSignal): Promise<string> {
+    const url = await this.api.get<string>(`/api2/repos/${libId}/upload-link/`, { p: dir }, signal);
     return `${url}?ret-json=1`;
   }
 
