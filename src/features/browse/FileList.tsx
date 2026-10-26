@@ -68,7 +68,7 @@ export function FileList(p: ListProps) {
         <col style={{ width: widths.size }} />
       </colgroup>
       <thead className="sticky top-0 z-10 bg-background">
-        <tr className="h-6 border-b border-border text-2xs text-muted-foreground">
+        <tr className="h-7 border-b border-border text-2xs text-muted-foreground">
           <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" resize="mtime" onResize={startResize} />
           <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} resize="size" onResize={startResize} />
           <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="pr-3 text-right" />
@@ -76,7 +76,7 @@ export function FileList(p: ListProps) {
       </thead>
       <tbody>
         {p.creatingFolder && (
-          <tr className="h-7">
+          <tr className="h-8.5">
             <td className="pl-3" colSpan={3}>
               <span className="flex items-center gap-2">
                 <IconFolder className="size-4 fill-primary/20 text-primary" />
@@ -95,7 +95,7 @@ export function FileList(p: ListProps) {
               asRow
               dataPath={e.path}
               className={cn(
-                "h-7 cursor-default select-none",
+                "h-8.5 cursor-default select-none",
                 i % 2 === 1 && !sel && "bg-muted/60",
                 sel && "bg-selection",
                 p.focusPath === e.path && "outline-1 -outline-offset-1 outline-primary/60",
@@ -150,8 +150,8 @@ export function FileListSkeleton() {
   return (
     <div className="flex flex-col">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className={cn("h-7", i % 2 === 1 && "bg-muted/60")}>
-          <div className="ml-3 mt-2 h-3 w-48 animate-pulse rounded bg-muted" />
+        <div key={i} className={cn("h-8.5", i % 2 === 1 && "bg-muted/60")}>
+          <div className="ml-3 mt-2.5 h-3.5 w-48 animate-pulse rounded bg-muted" />
         </div>
       ))}
     </div>
