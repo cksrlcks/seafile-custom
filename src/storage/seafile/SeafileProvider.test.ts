@@ -73,3 +73,22 @@ describe("SeafileProvider file operations", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api2/repos/r/file/?p=%2Fa.txt&reuse=1");
   });
 });
+
+describe("SeafileProvider.createShareLink", () => {
+  it("posts form and maps link", async () => {
+    fetchMock.mockResolvedValue(json({ link: "https://x/d/abc/", expire_date: "2026-11-02T00:00:00+09:00" }));
+    const res = await new SeafileProvider("https://host.example", "t").createShareLink("r", "/a.txt", { expireDays: 7 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api/v2.1/share-links/");
+    expect(String(init.body)).toBe("repo_id=r&path=%2Fa.txt&expire_days=7");
+    expect(res.url).toBe("https://x/d/abc/");
+    expect(typeof res.expiresAt).toBe("number");
+  });
+
+  it("omits expiresAt when server gives none", async () => {
+    fetchMock.mockResolvedValue(json({ link: "https://x/d/abc/", expire_date: "" }));
+    const res = await new SeafileProvider("https://host.example", "t").createShareLink("r", "/a.txt");
+    expect(res.expiresAt).toBeUndefined();
+    expect(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).toBe("repo_id=r&path=%2Fa.txt");
+  });
+});

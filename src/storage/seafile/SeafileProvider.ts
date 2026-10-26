@@ -126,7 +126,12 @@ export class SeafileProvider implements StorageProvider {
   async remove(libId: string, path: string, type: "file" | "dir"): Promise<void> {
     await this.api.delete(`/api2/repos/${libId}/${type}/`, { p: path });
   }
-  createShareLink(_libId: string, _path: string, _opts?: { password?: string; expireDays?: number }): Promise<ShareLink> {
-    throw new Error("not implemented");
+  async createShareLink(libId: string, path: string, opts?: { password?: string; expireDays?: number }): Promise<ShareLink> {
+    const form: Record<string, string> = { repo_id: libId, path };
+    if (opts?.password) form.password = opts.password;
+    if (opts?.expireDays) form.expire_days = String(opts.expireDays);
+    const res = await this.api.postForm<{ link: string; expire_date?: string }>("/api/v2.1/share-links/", form);
+    const expiresAt = res.expire_date ? Date.parse(res.expire_date) / 1000 : undefined;
+    return expiresAt && !Number.isNaN(expiresAt) ? { url: res.link, expiresAt } : { url: res.link };
   }
 }
