@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileStack, FolderPlus, LayoutGrid, List, LogOut, PanelLeft, RefreshCw, Trash2, Upload, User } from "lucide-react";
 import { cn } from "cn";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
@@ -41,6 +41,13 @@ export function MainScreen() {
   const libName = libs.data?.find((l) => l.id === loc.libId)?.name;
   const dropRef = useRef<DropZoneHandle>(null);
   const title = loc.path === "/" ? libName : baseName(loc.path);
+
+  // 시작 시 첫 번째(암호화 아닌) 저장소를 자동 선택
+  useEffect(() => {
+    if (loc.libId !== null || !libs.data) return;
+    const first = libs.data.find((l) => !l.encrypted);
+    if (first) setLocState({ libId: first.id, path: "/" });
+  }, [libs.data, loc.libId]);
 
   function setLoc(next: Location) {
     setLocState(next);
