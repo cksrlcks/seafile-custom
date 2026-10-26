@@ -2,6 +2,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-qu
 import { useMemo } from "react";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { MainScreen } from "@/features/browse/MainScreen";
+import { UploadQueueRoot } from "@/features/upload/useUploadQueue";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
 
@@ -19,7 +20,13 @@ function Gate() {
       }),
     [onUnauthorized],
   );
-  return <QueryClientProvider client={client}>{session.token ? <MainScreen /> : <LoginScreen />}</QueryClientProvider>;
+  return <QueryClientProvider client={client}>{session.token ? (
+        <UploadQueueRoot>
+          <MainScreen />
+        </UploadQueueRoot>
+      ) : (
+        <LoginScreen />
+      )}</QueryClientProvider>;
 }
 
 export default function App() {

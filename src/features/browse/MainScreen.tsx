@@ -4,6 +4,10 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
+import { OverwriteDialog, type OverwriteChoice } from "@/features/upload/OverwriteDialog";
+import { planUploads } from "@/features/upload/planUploads";
+import { UploadPanel } from "@/features/upload/UploadPanel";
+import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession } from "@/storage/StorageContext";
 import { baseName } from "@/storage/path";
 import type { Entry, UploadTask } from "@/storage/StorageProvider";
@@ -21,10 +25,22 @@ export function MainScreen() {
   const libName = libs.data?.find((l) => l.id === loc.libId)?.name;
   const dropRef = useRef<DropZoneHandle>(null);
   const title = loc.path === "/" ? libName : baseName(loc.path);
+  const { queue } = useUploadQueue();
+  const [pending, setPending] = useState<{ conflicts: UploadTask[]; fresh: UploadTask[] } | null>(null);
 
   function onFiles(tasks: UploadTask[]) {
-    // Task 8에서 업로드 큐로 연결
-    console.log("drop", tasks);
+    if (!loc.libId) return;
+    const plan = planUploads(tasks, dir.data ?? []);
+    if (plan.conflicts.length === 0) queue.add(loc.libId, plan.fresh);
+    else setPending(plan);
+  }
+
+  function onOverwriteChoice(c: OverwriteChoice) {
+    if (pending && loc.libId) {
+      if (c === "overwrite") queue.add(loc.libId, [...pending.fresh, ...pending.conflicts]);
+      else if (c === "skip") queue.add(loc.libId, pending.fresh);
+    }
+    setPending(null);
   }
 
   function openFile(entry: Entry) {
@@ -87,6 +103,8 @@ export function MainScreen() {
           )}
         </main>
       </div>
+      <UploadPanel />
+      <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
     </div>
   );
 }
