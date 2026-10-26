@@ -30,7 +30,7 @@ export function DropZone({ targetDir, children, onFiles, handle }: Props) {
       <input {...getInputProps()} />
       {children}
       {isDragActive && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-primary bg-background/80 text-sm">
+        <div className="pointer-events-none absolute inset-4 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/70 bg-background/85 text-md backdrop-blur-xs">
           <Upload className="size-8 text-primary" />
           <span>
             여기에 놓으면 <span className="font-medium">{targetDir}</span> 에 업로드

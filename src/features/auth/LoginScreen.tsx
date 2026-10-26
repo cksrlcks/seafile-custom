@@ -1,24 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/ui/logo";
 import { useSession } from "@/storage/StorageContext";
-import { StorageError } from "@/storage/StorageProvider";
-
-function describe(e: unknown, setOtpRequired: (v: boolean) => void): string {
-  if (!(e instanceof StorageError)) return "알 수 없는 오류가 발생했습니다";
-  if (e.message === "otp required" || (e.status === 400 && /otp/i.test(e.message))) {
-    setOtpRequired(true);
-    return "2단계 인증 코드를 입력하세요";
-  }
-  switch (e.kind) {
-    case "unauthorized":
-      return "아이디 또는 비밀번호가 틀렸습니다";
-    case "network":
-      return "서버에 연결할 수 없습니다. 서버 주소와 CORS 설정을 확인하세요";
-    default:
-      return `서버 오류 (${e.status ?? ""})`;
-  }
-}
+import { loginErrorMessage } from "./loginError";
 
 export function LoginScreen() {
   const { session, login } = useSession();
@@ -38,16 +23,18 @@ export function LoginScreen() {
       const url = baseUrl.trim().replace(/\/+$/, "");
       await login({ kind: url === "mock" ? "mock" : "seafile", baseUrl: url }, username, password, otp || undefined);
     } catch (err) {
-      setError(describe(err, setOtpRequired));
+      const info = loginErrorMessage(err);
+      setError(info.message);
+      if (info.otpRequired) setOtpRequired(true);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-background">
-      <form onSubmit={submit} className="flex w-80 flex-col gap-2 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h1 className="mb-2 text-base font-semibold">seadrive</h1>
+    <div className="flex h-screen items-center justify-center bg-linear-to-b from-sidebar to-sidebar-bottom">
+      <form onSubmit={submit} className="flex w-88 flex-col gap-2 rounded-2xl border border-border bg-card p-8 shadow-float">
+        <div className="mb-4 flex items-center gap-2.5"><Logo /><h1 className="text-lg font-semibold tracking-tight">seadrive</h1></div>
         <label className="text-xs text-muted-foreground">서버 주소</label>
         <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." required />
         <label className="text-xs text-muted-foreground">아이디</label>

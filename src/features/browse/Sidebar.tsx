@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, PanelLeft, Waves } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, PanelLeft } from "lucide-react";
 import { cn } from "cn";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import type { Library } from "@/storage/StorageProvider";
 import { useCurrentDir, type Location } from "./useCurrentDir";
 
@@ -12,20 +13,21 @@ interface Props {
   onCollapse(): void;
 }
 
+/** 시안: 연회색(위가 살짝 밝은) 사이드바, 로고 18px, 섹션 라벨 15px 회색, 행 40px, 선택 행은 흰색+옅은 그림자 */
 export function Sidebar({ libraries, loc, onNavigate, onCollapse }: Props) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-6 overflow-y-auto px-5 py-5">
-      <div className="flex h-9 items-center gap-2 px-1">
-        <Waves className="size-7 text-primary" />
-        <span className="text-xl font-semibold tracking-tight">seadrive</span>
+    <aside className="flex w-80 shrink-0 flex-col gap-7 overflow-y-auto bg-linear-to-b from-sidebar to-sidebar-bottom px-6 pt-9 pb-6">
+      <div className="flex h-8 items-center gap-2.5 px-1">
+        <Logo />
+        <span className="text-lg font-semibold tracking-tight">seadrive</span>
         <div className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={onCollapse} title="사이드바 접기" className="text-muted-foreground">
-          <PanelLeft className="size-4" />
+        <Button variant="ghost" size="icon-sm" onClick={onCollapse} title="사이드바 접기" className="text-muted-foreground hover:bg-sidebar-accent">
+          <PanelLeft className="size-4.5" />
         </Button>
       </div>
 
-      <section className="flex flex-col gap-1">
-        <div className="mb-1 px-2 text-sm text-muted-foreground">라이브러리</div>
+      <section className="flex flex-col gap-0.5">
+        <div className="mb-2 px-1 text-md text-muted-foreground">라이브러리</div>
         {libraries?.map((lib) =>
           lib.encrypted ? (
             <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화 라이브러리는 지원하지 않습니다" />
@@ -40,8 +42,8 @@ export function Sidebar({ libraries, loc, onNavigate, onCollapse }: Props) {
 
 function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; onNavigate(loc: Location): void }) {
   const active = loc.libId === lib.id;
-  const [open, setOpen] = useState(false);
-  const expanded = open || active;
+  const [open, setOpen] = useState<boolean | null>(null); // null = 사용자가 안 건드림 → 활성이면 펼침
+  const expanded = open ?? active;
   return (
     <>
       <Row
@@ -50,7 +52,7 @@ function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; on
         label={lib.name}
         selected={active && loc.path === "/"}
         chevron={expanded ? "down" : "right"}
-        onChevron={() => setOpen((v) => !v || !active)}
+        onChevron={() => setOpen(!expanded)}
         onClick={() => onNavigate({ libId: lib.id, path: "/" })}
       />
       {expanded && <DirChildren libId={lib.id} path="/" depth={1} loc={loc} onNavigate={onNavigate} />}
@@ -58,25 +60,27 @@ function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; on
   );
 }
 
-/** 폴더 하위 목록. 같은 쿼리 키를 쓰므로 본문과 캐시를 공유한다. */
+/** 폴더 하위 목록. 본문과 같은 쿼리 키라 캐시를 공유한다. 시안의 세로 연결선 포함. */
 function DirChildren({ libId, path, depth, loc, onNavigate }: { libId: string; path: string; depth: number; loc: Location; onNavigate(loc: Location): void }) {
   const q = useCurrentDir({ libId, path });
   const dirs = q.data?.filter((e) => e.type === "dir") ?? [];
-  if (q.isLoading) return <div className="h-8 animate-pulse rounded-lg bg-muted/60" style={{ marginLeft: depth * 16 + 8 }} />;
+  if (q.isLoading) return <div className="my-1 h-8 animate-pulse rounded-lg bg-sidebar-accent" style={{ marginLeft: depth * 20 + 8 }} />;
+  if (dirs.length === 0) return null;
   return (
-    <>
+    <div className="relative">
+      <span className="absolute top-1 bottom-2 w-px bg-foreground/12" style={{ left: depth * 20 - 2 }} />
       {dirs.map((d) => (
         <DirNode key={d.path} libId={libId} path={d.path} name={d.name} depth={depth} loc={loc} onNavigate={onNavigate} />
       ))}
-    </>
+    </div>
   );
 }
 
 function DirNode({ libId, path, name, depth, loc, onNavigate }: { libId: string; path: string; name: string; depth: number; loc: Location; onNavigate(loc: Location): void }) {
   const selected = loc.libId === libId && loc.path === path;
   const ancestor = loc.libId === libId && loc.path.startsWith(path + "/");
-  const [open, setOpen] = useState(false);
-  const expanded = open || ancestor;
+  const [open, setOpen] = useState<boolean | null>(null);
+  const expanded = open ?? ancestor;
   return (
     <>
       <Row
@@ -85,7 +89,7 @@ function DirNode({ libId, path, name, depth, loc, onNavigate }: { libId: string;
         label={name}
         selected={selected}
         chevron={expanded ? "down" : "right"}
-        onChevron={() => setOpen((v) => !v)}
+        onChevron={() => setOpen(!expanded)}
         onClick={() => onNavigate({ libId, path })}
       />
       {expanded && <DirChildren libId={libId} path={path} depth={depth + 1} loc={loc} onNavigate={onNavigate} />}
@@ -115,13 +119,13 @@ function Row({
   onClick?(): void;
 }) {
   return (
-    <div className="relative flex items-center" style={{ paddingLeft: depth * 16 }}>
+    <div className="relative my-0.5 flex items-center" style={{ paddingLeft: depth * 20 }}>
       {chevron && (
         <Button
           variant="ghost"
           size="icon-xs"
-          className="absolute z-10 size-6 text-muted-foreground"
-          style={{ left: depth * 16 + 4 }}
+          className="absolute z-10 size-6 text-muted-foreground hover:bg-transparent"
+          style={{ left: depth * 20 + 6 }}
           onClick={(e) => {
             e.stopPropagation();
             onChevron?.();
@@ -136,9 +140,9 @@ function Row({
         onClick={onClick}
         title={title ?? label}
         className={cn(
-          "h-10 w-full justify-start gap-2.5 rounded-xl pr-3 text-md font-normal text-foreground/80 hover:bg-accent",
-          chevron ? "pl-8" : "pl-3",
-          selected && "bg-card font-medium text-foreground shadow-sm hover:bg-card",
+          "h-10 w-full justify-start gap-2.5 rounded-[10px] pr-3 text-md font-normal text-foreground hover:bg-sidebar-accent",
+          chevron ? "pl-9" : "pl-3",
+          selected && "bg-card font-medium shadow-item hover:bg-card",
           disabled && "text-muted-foreground",
         )}
       >
