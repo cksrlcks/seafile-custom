@@ -70,8 +70,8 @@ export function FileList(p: ListProps) {
       <thead className="sticky top-0 z-10 bg-background">
         <tr className="h-7 border-b border-border text-2xs text-muted-foreground">
           <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" resize="mtime" onResize={startResize} />
-          <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} resize="size" onResize={startResize} />
-          <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="pr-3 text-right" />
+          <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} className="pl-3" resize="size" onResize={startResize} />
+          <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="pr-3 pl-3 text-right" />
         </tr>
       </thead>
       <tbody>
@@ -114,8 +114,8 @@ export function FileList(p: ListProps) {
                   )}
                 </span>
               </td>
-              <td className="text-muted-foreground">{formatDateLong(e.mtime)}</td>
-              <td className="pr-3 text-right text-muted-foreground tabular-nums">{e.type === "file" ? formatSize(e.size) : ""}</td>
+              <td className="pl-3 text-muted-foreground">{formatDateLong(e.mtime)}</td>
+              <td className="pr-3 pl-3 text-right text-muted-foreground tabular-nums">{e.type === "file" ? formatSize(e.size) : ""}</td>
             </EntryContextMenu>
           );
         })}
@@ -139,8 +139,10 @@ function Th({ label, k, sort, onSort, className, resize, onResize }: { label: st
           aria-orientation="vertical"
           onPointerDown={(e) => onResize?.(resize, e)}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-1 -right-1 bottom-1 z-20 w-2 cursor-col-resize border-r border-border hover:border-primary"
-        />
+          className="group absolute top-0 right-0 bottom-0 z-20 w-2 translate-x-1/2 cursor-col-resize"
+        >
+          <span className="absolute top-1.5 bottom-1.5 left-1/2 w-px bg-border group-hover:bg-primary" />
+        </span>
       )}
     </th>
   );
