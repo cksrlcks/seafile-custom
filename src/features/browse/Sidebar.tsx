@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { InlineName } from "./InlineName";
+import { StorageCard } from "./StorageCard";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import type { Library } from "@/storage/StorageProvider";
@@ -33,10 +34,10 @@ export function Sidebar({ libraries, loc, onNavigate, onCollapse, onRenameLibrar
       </div>
 
       <section className="flex flex-col gap-0.5">
-        <div className="mb-2 px-1 text-md text-muted-foreground">라이브러리</div>
+        <div className="mb-2 px-1 text-md text-muted-foreground">내 저장소</div>
         {libraries?.map((lib) =>
           lib.encrypted ? (
-            <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화 라이브러리는 지원하지 않습니다" />
+            <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />
           ) : renamingId === lib.id ? (
             <div key={lib.id} className="my-0.5 pl-3">
               <InlineName
@@ -64,6 +65,9 @@ export function Sidebar({ libraries, loc, onNavigate, onCollapse, onRenameLibrar
           ),
         )}
       </section>
+      <div className="mt-auto">
+        <StorageCard />
+      </div>
     </aside>
   );
 }

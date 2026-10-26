@@ -14,6 +14,7 @@ export function UploadQueueRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
     queue.onAllDone = (libId, dirs) => {
       for (const d of dirs) void qc.invalidateQueries({ queryKey: ["dir", libId, d] });
+      void qc.invalidateQueries({ queryKey: ["account"] });
     };
     queue.onUnauthorized = () => {
       queue.cancelAll();

@@ -1,4 +1,4 @@
-import type { Entry, Library, ShareLink, StorageProvider, UploadTask } from "../StorageProvider";
+import type { Account, Entry, Library, ShareLink, StorageProvider, UploadTask } from "../StorageProvider";
 import { StorageError } from "../StorageProvider";
 import { baseName, joinPath, parentPath } from "../path";
 
@@ -48,6 +48,11 @@ export class MockProvider implements StorageProvider {
   }
   isLoggedIn(): boolean {
     return this.token !== null;
+  }
+  async getAccount(): Promise<Account> {
+    await delay(150);
+    const usage = [...this.tree.values()].flat().reduce((a, e) => a + e.size, 0) + 12_300_000_000;
+    return { name: "김찬기", email: "me@example.com", usage, quota: 50 * 1024 ** 3 };
   }
   async listLibraries(): Promise<Library[]> {
     await delay(200);

@@ -38,7 +38,10 @@ export function useEntryActions(loc: Location) {
   });
   const remove = useMutation({
     mutationFn: (entry: Entry) => storage.remove(libId, entry.path, entry.type),
-    onSuccess: (_d, entry) => refresh(parentPath(entry.path)),
+    onSuccess: (_d, entry) => {
+      void refresh(parentPath(entry.path));
+      void qc.invalidateQueries({ queryKey: ["account"] });
+    },
   });
   const download = useMutation({
     mutationFn: async (entry: Entry) => openDownload(await storage.downloadUrl(libId, entry.path), entry.name),

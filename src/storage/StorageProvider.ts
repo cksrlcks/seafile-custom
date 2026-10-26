@@ -23,6 +23,15 @@ export interface UploadTask {
   relativePath?: string;
 }
 
+export interface Account {
+  name: string;
+  email: string;
+  /** 사용 중인 바이트 */
+  usage: number;
+  /** 할당량 바이트. 무제한이면 null */
+  quota: number | null;
+}
+
 export interface ShareLink {
   url: string;
   expiresAt?: number;
@@ -54,6 +63,7 @@ export interface StorageProvider {
   logout(): Promise<void>;
   isLoggedIn(): boolean;
 
+  getAccount(): Promise<Account>;
   listLibraries(): Promise<Library[]>;
   renameLibrary(libId: string, newName: string): Promise<void>;
   listDir(libId: string, path: string): Promise<Entry[]>;

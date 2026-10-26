@@ -103,3 +103,19 @@ describe("SeafileProvider.renameLibrary", () => {
     expect(String(init.body)).toBe("repo_name=%EC%83%88+%EC%9D%B4%EB%A6%84");
   });
 });
+
+describe("SeafileProvider.getAccount", () => {
+  it("maps usage and quota", async () => {
+    fetchMock.mockResolvedValue(json({ email: "me@x.com", name: "Me", usage: 1234, total: 53687091200 }));
+    const acc = await new SeafileProvider("https://host.example", "t").getAccount();
+    expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api2/account/info/");
+    expect(acc).toEqual({ email: "me@x.com", name: "Me", usage: 1234, quota: 53687091200 });
+  });
+
+  it("maps unlimited quota (-2) to null", async () => {
+    fetchMock.mockResolvedValue(json({ email: "me@x.com", name: "", usage: 0, total: -2 }));
+    const acc = await new SeafileProvider("https://host.example", "t").getAccount();
+    expect(acc.quota).toBeNull();
+    expect(acc.name).toBe("me@x.com");
+  });
+});

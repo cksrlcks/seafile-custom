@@ -1,4 +1,4 @@
-import { StorageError, type Entry, type Library, type ShareLink, type StorageProvider, type UploadTask } from "../StorageProvider";
+import { StorageError, type Account, type Entry, type Library, type ShareLink, type StorageProvider, type UploadTask } from "../StorageProvider";
 import { joinPath } from "../path";
 import { SeafileApi } from "./api";
 import { CHUNK_SIZE, chunkRanges } from "./chunk";
@@ -42,6 +42,11 @@ export class SeafileProvider implements StorageProvider {
 
   isLoggedIn(): boolean {
     return this._token !== null;
+  }
+
+  async getAccount(): Promise<Account> {
+    const r = await this.api.get<{ email: string; name?: string; usage: number; total: number }>("/api2/account/info/");
+    return { email: r.email, name: r.name || r.email, usage: r.usage, quota: r.total > 0 ? r.total : null };
   }
 
   async listLibraries(): Promise<Library[]> {

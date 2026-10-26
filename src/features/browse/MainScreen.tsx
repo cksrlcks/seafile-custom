@@ -123,8 +123,8 @@ export function MainScreen() {
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-          {libs.error && <ErrorBanner message="라이브러리 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
-          {renameLibrary.error && <ErrorBanner message={`라이브러리 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
+          {libs.error && <ErrorBanner message="저장소 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
+          {renameLibrary.error && <ErrorBanner message={`저장소 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
 
           {/* 시안 실측: 브레드크럼 바 84px, 15px 회색, 문서 아이콘 */}
           <div className="flex h-21 shrink-0 items-center gap-2.5 border-b border-border px-7">
@@ -137,7 +137,7 @@ export function MainScreen() {
             {loc.libId ? (
               <Breadcrumb libName={libName} path={loc.path} onNavigate={(path) => setLoc({ ...loc, path })} />
             ) : (
-              <span className="text-md text-muted-foreground">라이브러리</span>
+              <span className="text-md text-muted-foreground">내 저장소</span>
             )}
             <div className="flex-1" />
             <DropdownMenu>
@@ -154,7 +154,7 @@ export function MainScreen() {
           </div>
 
           {loc.libId === null ? (
-            <Empty text="라이브러리를 선택하세요" />
+            <Empty text="왼쪽에서 저장소를 선택하세요" />
           ) : (
             <>
               {/* 시안 실측: 제목 바 66px, 제목 20px, 세로 구분선, 활성 항목만 연회색 칩(44px, r=10) */}
