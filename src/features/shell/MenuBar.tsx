@@ -31,6 +31,7 @@ export interface MenuActions {
   canForward: boolean;
   canUp: boolean;
   logout(): void;
+  settings(): void;
 }
 
 const MOD = modKey();
@@ -67,6 +68,9 @@ export function MenuBar(a: MenuActions) {
               삭제<MenubarShortcut>Del</MenubarShortcut>
             </MenubarItem>
             <MenubarSeparator />
+            <MenubarItem onClick={a.settings} className={item}>
+              설정…<MenubarShortcut>{MOD}+,</MenubarShortcut>
+            </MenubarItem>
             <MenubarItem onClick={a.logout} className={item}>
               로그아웃
             </MenubarItem>

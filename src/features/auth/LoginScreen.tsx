@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/storage/StorageContext";
+import { connectionFor } from "@/storage/session";
 import { loginErrorMessage } from "./loginError";
 
 export function LoginScreen() {
@@ -19,8 +20,7 @@ export function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      const url = baseUrl.trim().replace(/\/+$/, "");
-      await login({ kind: url === "mock" ? "mock" : "seafile", baseUrl: url }, username, password, otp || undefined);
+      await login(connectionFor(baseUrl), username, password, otp || undefined);
     } catch (err) {
       const info = loginErrorMessage(err);
       setError(info.message);

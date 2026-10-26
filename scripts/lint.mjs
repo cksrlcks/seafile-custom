@@ -22,7 +22,6 @@ const storageAllow = [
   /^src\/storage\/StorageProvider\.ts$/,
   /^src\/storage\/createProvider\.ts$/,
   /^src\/storage\/session\.ts$/,
-  /^src\/features\/auth\/LoginScreen\.tsx$/,
 ];
 for (const f of walk(join(root, "src"))) {
   const r = rel(f);

@@ -4,6 +4,7 @@ import { formatDateLong, formatSize } from "@/lib/format";
 import type { Entry } from "@/storage/StorageProvider";
 import { EntryContextMenu, type EntryMenuActions } from "./ContextMenu";
 import { InlineName } from "./InlineName";
+import { useColumnWidths, type ColKey } from "./useColumnWidths";
 
 export type ViewMode = "list" | "grid";
 export type SortKey = "name" | "mtime" | "size";
@@ -58,13 +59,19 @@ export interface ListProps {
 
 /** 표 보기: 24px 머리글, 28px 행, 줄무늬, 전체 행 선택 */
 export function FileList(p: ListProps) {
+  const { widths, startResize } = useColumnWidths();
   return (
     <table className="w-full table-fixed border-collapse text-sm">
+      <colgroup>
+        <col />
+        <col style={{ width: widths.mtime }} />
+        <col style={{ width: widths.size }} />
+      </colgroup>
       <thead className="sticky top-0 z-10 bg-background">
         <tr className="h-6 border-b border-border text-2xs text-muted-foreground">
-          <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" />
-          <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} className="w-44" />
-          <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="w-24 pr-3 text-right" />
+          <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" resize="mtime" onResize={startResize} />
+          <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} resize="size" onResize={startResize} />
+          <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="pr-3 text-right" />
         </tr>
       </thead>
       <tbody>
@@ -117,14 +124,24 @@ export function FileList(p: ListProps) {
   );
 }
 
-function Th({ label, k, sort, onSort, className }: { label: string; k: SortKey; sort: Sort; onSort(k: SortKey): void; className?: string }) {
+/** 머리글 셀. resize가 있으면 오른쪽 경계를 끌어 "다음 열"의 너비를 조절한다(탐색기와 같은 방식). */
+function Th({ label, k, sort, onSort, className, resize, onResize }: { label: string; k: SortKey; sort: Sort; onSort(k: SortKey): void; className?: string; resize?: ColKey; onResize?(key: ColKey, e: React.PointerEvent): void }) {
   const active = sort.key === k;
   return (
-    <th className={cn("cursor-default text-left font-normal select-none hover:bg-accent", className)} onClick={() => onSort(k)}>
+    <th className={cn("relative cursor-default text-left font-normal select-none hover:bg-accent", className)} onClick={() => onSort(k)}>
       <span className="inline-flex items-center gap-1">
         {label}
         {active && (sort.dir === "asc" ? <IconArrowUp className="size-3" /> : <IconArrowDown className="size-3" />)}
       </span>
+      {resize && (
+        <span
+          role="separator"
+          aria-orientation="vertical"
+          onPointerDown={(e) => onResize?.(resize, e)}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-1 -right-1 bottom-1 z-20 w-2 cursor-col-resize border-r border-border hover:border-primary"
+        />
+      )}
     </th>
   );
 }

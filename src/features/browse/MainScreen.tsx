@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PreviewModal } from "@/features/preview/PreviewModal";
 import { previewKind } from "@/features/preview/previewKind";
 import { ShareDialog } from "@/features/share/ShareDialog";
+import { SettingsDialog } from "@/features/settings/SettingsDialog";
 import { StatusBar } from "@/features/shell/StatusBar";
 import { TitleBar, type Crumb } from "@/features/shell/TitleBar";
 import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
@@ -132,6 +133,7 @@ export function MainScreen() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [deleting, setDeleting] = useState<Entry[]>([]);
   const [sharing, setSharing] = useState<Entry | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const previewable = entries.filter((e) => e.type === "file" && previewKind(e.name) !== null);
   const previewIndex = previewable.findIndex((e) => e.path === previewPath);
@@ -176,6 +178,7 @@ export function MainScreen() {
     else if (e.altKey && e.key === "ArrowRight") (e.preventDefault(), go(1));
     else if (e.key === "F5") (e.preventDefault(), void qc.invalidateQueries({ queryKey: ["dir"] }));
     else if (mod && e.shiftKey && e.key.toLowerCase() === "n") (e.preventDefault(), setCreatingFolder(true));
+    else if (mod && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
   }
 
   const listProps = {
@@ -229,6 +232,7 @@ export function MainScreen() {
           canForward,
           canUp: loc.libId !== null && loc.path !== "/",
           logout,
+          settings: () => setSettingsOpen(true),
         }}
         crumbs={crumbs}
         onNavigate={(path) => setLoc({ ...loc, path })}
@@ -278,6 +282,7 @@ export function MainScreen() {
         <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={() => setPreviewPath(null)} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate(e)} />
       )}
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog
         entries={deleting}

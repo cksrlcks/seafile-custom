@@ -8,6 +8,12 @@ export interface Session {
 const KEY = "seadrive.session";
 const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "https://seafile.heavybear-lab.net" }, token: null };
 
+/** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. */
+export function connectionFor(url: string): Connection {
+  const baseUrl = url.trim().replace(/\/+$/, "");
+  return { kind: baseUrl === "mock" ? "mock" : "seafile", baseUrl };
+}
+
 export function loadSession(storage: Storage = localStorage): Session {
   try {
     const raw = storage.getItem(KEY);

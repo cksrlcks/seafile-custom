@@ -1,4 +1,4 @@
-import { IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebar, IconList, IconLogout, IconRefresh, IconSearch, IconUpload, IconUser } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebar, IconList, IconLogout, IconRefresh, IconSearch, IconSettings, IconUpload, IconUser } from "@tabler/icons-react";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,9 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={m.settings}>
+              <IconSettings className="size-4" stroke={1.75} /> 설정…
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={m.logout}>
               <IconLogout className="size-4" stroke={1.75} /> 로그아웃
             </DropdownMenuItem>
