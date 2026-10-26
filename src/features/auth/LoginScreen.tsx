@@ -5,6 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useSession } from "@/storage/StorageContext";
 import { connectionFor, loadPrefs, savePrefs } from "@/storage/session";
+import { isMac, isTauri, showWindowControls } from "@/features/shell/platform";
+import { WindowControls } from "@/features/shell/WindowControls";
 import { loginErrorMessage } from "./loginError";
 
 export function LoginScreen() {
@@ -39,8 +41,15 @@ export function LoginScreen() {
 
   const host = baseUrl.replace(/^https?:\/\//, "");
 
+  const drag = isTauri() ? { "data-tauri-drag-region": true } : {};
   return (
-    <div className="flex h-screen items-center justify-center bg-linear-to-b from-background to-sidebar">
+    <div className="flex h-screen flex-col bg-linear-to-b from-background to-sidebar">
+      {/* 기본 제목 표시줄이 없으므로 로그인 화면에도 드래그 영역과 창 버튼을 둔다 */}
+      <div {...drag} className={isMac() && isTauri() ? "flex h-9 shrink-0 pl-20" : "flex h-9 shrink-0"}>
+        <div {...drag} className="flex-1" />
+        {showWindowControls() && <WindowControls />}
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center pb-9">
       <form onSubmit={submit} className="flex w-88 flex-col gap-4 rounded-xl border border-border bg-card p-8 text-sm shadow-float">
         <div className="flex flex-col items-center gap-2 pb-2">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -92,6 +101,7 @@ export function LoginScreen() {
           {showServer && <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="h-8 md:text-xs" required />}
         </div>
       </form>
+      </div>
     </div>
   );
 }
