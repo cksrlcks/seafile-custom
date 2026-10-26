@@ -1,7 +1,7 @@
 import { cn } from "cn";
 import { FolderGlyph } from "@/components/ui/folder-glyph";
 import { EntryContextMenu } from "./ContextMenu";
-import { EntryIcon, type ListProps } from "./FileList";
+import { EntryIcon, SharedBadge, type ListProps } from "./FileList";
 import { InlineName } from "./InlineName";
 
 /** 아이콘 보기: 96px 셀, 64px 아이콘, 12px 두 줄 라벨 */
@@ -31,7 +31,10 @@ export function IconGrid(p: ListProps) {
             onDoubleClick={() => p.renamingPath !== e.path && p.onOpen(e)}
             onContextMenu={() => !sel && p.onSelect(e, { ctrlKey: false, metaKey: false, shiftKey: false } as React.MouseEvent)}
           >
-            <div className="flex h-16 items-center justify-center">{e.type === "dir" ? <FolderGlyph className="size-16" /> : <EntryIcon entry={e} className="size-12" />}</div>
+            <div className="relative flex h-16 items-center justify-center">
+              <EntryIcon entry={e} size={48} className="size-12" fallback={e.type === "dir" ? <FolderGlyph className="size-16" /> : undefined} />
+              {p.sharedPaths?.has(e.path) && <SharedBadge className="right-3 bottom-1" />}
+            </div>
             {p.renamingPath === e.path ? (
               <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 text-center text-xs md:text-xs" />
             ) : (

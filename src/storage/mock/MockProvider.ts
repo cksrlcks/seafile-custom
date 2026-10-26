@@ -1,4 +1,4 @@
-import type { Account, Entry, Library, ShareLink, StorageProvider, UploadTask } from "../StorageProvider";
+import type { Account, Entry, Library, ShareLink, ShareLinkInfo, StorageProvider, TrashEntry, UploadTask } from "../StorageProvider";
 import { StorageError } from "../StorageProvider";
 import { baseName, joinPath, parentPath } from "../path";
 
@@ -11,6 +11,10 @@ export class MockProvider implements StorageProvider {
     { id: "vault", name: "금고", size: 0, mtime: 1_760_000_000, encrypted: true },
   ];
   private tree = new Map<string, Entry[]>();
+  private trash = new Map<string, TrashEntry[]>();
+  private links: ShareLinkInfo[] = [];
+  /** 내용이 바뀔 때마다 증가. headCommitId 흉내 */
+  private rev = 0;
 
   constructor(initialToken: string | null) {
     this.token = initialToken;
@@ -56,7 +60,7 @@ export class MockProvider implements StorageProvider {
   }
   async listLibraries(): Promise<Library[]> {
     await delay(200);
-    return this.libs;
+    return this.libs.map((l) => ({ ...l, headCommitId: `${l.id}-${this.rev}` }));
   }
   async renameLibrary(libId: string, newName: string): Promise<void> {
     await delay(150);
@@ -65,6 +69,10 @@ export class MockProvider implements StorageProvider {
   async listDir(libId: string, path: string): Promise<Entry[]> {
     await delay(200);
     return [...this.get(libId, path)];
+  }
+  async listTree(libId: string): Promise<Entry[]> {
+    await delay(300);
+    return [...this.tree.entries()].filter(([k]) => k.startsWith(`${libId}:`)).flatMap(([, v]) => v);
   }
 
   async upload(libId: string, task: UploadTask, onProgress: (sent: number, total: number) => void, signal?: AbortSignal): Promise<void> {
@@ -80,6 +88,7 @@ export class MockProvider implements StorageProvider {
     const list = this.get(libId, dirPath).filter((e) => e.name !== task.file.name);
     list.push(file(joinPath(dirPath, task.file.name), task.file.size, Date.now() / 1000));
     this.set(libId, dirPath, list);
+    this.rev++;
   }
 
   private ensureDir(libId: string, path: string) {
@@ -103,6 +112,7 @@ export class MockProvider implements StorageProvider {
   async mkdir(libId: string, path: string): Promise<void> {
     await delay(150);
     this.ensureDir(libId, path);
+    this.rev++;
   }
   async rename(libId: string, path: string, newName: string, _type: "file" | "dir"): Promise<void> {
     await delay(150);
@@ -112,15 +122,52 @@ export class MockProvider implements StorageProvider {
       parent,
       this.get(libId, parent).map((e) => (e.path === path ? { ...e, name: newName, path: joinPath(parent, newName) } : e)),
     );
+    this.rev++;
   }
   async remove(libId: string, path: string): Promise<void> {
     await delay(150);
     const parent = parentPath(path);
+    const gone = this.get(libId, parent).find((e) => e.path === path);
     this.set(libId, parent, this.get(libId, parent).filter((e) => e.path !== path));
+    if (gone) this.trash.set(libId, [{ name: gone.name, type: gone.type, size: gone.size, parentDir: parent, deletedAt: Date.now() / 1000, commitId: `c${Date.now()}` }, ...(this.trash.get(libId) ?? [])]);
+    this.rev++;
   }
-  async createShareLink(_libId: string, _path: string, opts?: { expireDays?: number }): Promise<ShareLink> {
+  async listTrash(libId: string): Promise<TrashEntry[]> {
+    await delay(200);
+    return [...(this.trash.get(libId) ?? [])];
+  }
+  async restoreTrash(libId: string, e: TrashEntry): Promise<void> {
+    await delay(150);
+    this.trash.set(libId, (this.trash.get(libId) ?? []).filter((t) => t.commitId !== e.commitId));
+    this.ensureDir(libId, e.parentDir);
+    const path = joinPath(e.parentDir, e.name);
+    const list = this.get(libId, e.parentDir).filter((x) => x.path !== path);
+    list.push(e.type === "dir" ? dir(path, e.deletedAt) : file(path, e.size, e.deletedAt));
+    this.set(libId, e.parentDir, list);
+    if (e.type === "dir" && !this.tree.has(this.key(libId, path))) this.set(libId, path, []);
+    this.rev++;
+  }
+  async emptyTrash(libId: string): Promise<void> {
+    await delay(150);
+    this.trash.delete(libId);
+  }
+  async createShareLink(libId: string, path: string, opts?: { password?: string; expireDays?: number }): Promise<ShareLink> {
     await delay(300);
-    return { url: `https://mock.example/d/${Math.random().toString(36).slice(2, 10)}/`, expiresAt: opts?.expireDays ? Date.now() / 1000 + opts.expireDays * 86400 : undefined };
+    const dup = this.links.find((l) => l.libId === libId && l.path === path);
+    if (dup) throw new StorageError("server", `Share link ${dup.token} already exists.`, 400); // 실제 서버와 같은 거절
+    const token = Math.random().toString(36).slice(2, 10);
+    const link: ShareLink = { url: `https://mock.example/d/${token}/`, expiresAt: opts?.expireDays ? Date.now() / 1000 + opts.expireDays * 86400 : undefined };
+    const entry = this.get(libId, parentPath(path)).find((e) => e.path === path);
+    this.links.unshift({ token, url: link.url, libId, libName: this.libs.find((l) => l.id === libId)?.name ?? libId, path, name: baseName(path), type: entry?.type ?? "file", expiresAt: link.expiresAt, expired: false, protected: !!opts?.password, views: 0, createdAt: Date.now() / 1000 });
+    return link;
+  }
+  async listShareLinks(): Promise<ShareLinkInfo[]> {
+    await delay(200);
+    return [...this.links];
+  }
+  async deleteShareLink(token: string): Promise<void> {
+    await delay(150);
+    this.links = this.links.filter((l) => l.token !== token);
   }
 }
 

@@ -9,7 +9,10 @@ export function useEntryActions(loc: Location) {
   const storage = useStorage();
   const qc = useQueryClient();
   const libId = loc.libId!;
-  const refresh = (path: string) => qc.invalidateQueries({ queryKey: ["dir", libId, path] });
+  const refresh = (path: string) => {
+    void qc.invalidateQueries({ queryKey: ["libraries"] }); // head commit이 바뀌어 검색 인덱스가 갱신되도록
+    return qc.invalidateQueries({ queryKey: ["dir", libId, path] });
+  };
 
   const mkdir = useMutation({
     mutationFn: (name: string) => storage.mkdir(libId, joinPath(loc.path, name)),

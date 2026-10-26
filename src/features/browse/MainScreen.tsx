@@ -1,10 +1,14 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PreviewModal } from "@/features/preview/PreviewModal";
 import { previewKind } from "@/features/preview/previewKind";
 import { ShareDialog } from "@/features/share/ShareDialog";
+import { ShareLinksPage } from "@/features/share/ShareLinksPage";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
+import { TrashDialog } from "@/features/trash/TrashDialog";
+import { checkForUpdate } from "@/features/shell/updater";
+import { UpdateNotice } from "@/features/shell/UpdateNotice";
 import { StatusBar } from "@/features/shell/StatusBar";
 import { TitleBar, type Crumb } from "@/features/shell/TitleBar";
 import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
@@ -14,6 +18,9 @@ import { UploadPanel } from "@/features/upload/UploadPanel";
 import { DownloadPanel } from "@/features/download/DownloadPanel";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
+import { useMarquee } from "./useMarquee";
+import { FileSelectionBar } from "./SelectionBar";
+import { useSidebarWidth } from "./useSidebarWidth";
 import { joinPath, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
@@ -23,10 +30,9 @@ import { IconGrid } from "./IconGrid";
 import { Sidebar } from "./Sidebar";
 import { useCurrentDir, useLibraries, type Location } from "./useCurrentDir";
 import { useEntryActions } from "./useEntryActions";
-import { useRecursiveSearch } from "@/features/search/useRecursiveSearch";
 
 export function MainScreen() {
-  const { session, logout } = useSession();
+  const { logout } = useSession();
   const storage = useStorage();
   const qc = useQueryClient();
   const libs = useLibraries();
@@ -41,16 +47,17 @@ export function MainScreen() {
       const stack = [...h.stack.slice(0, h.index + 1), next];
       return { stack, index: stack.length - 1 };
     });
+    setPage("files");
     setSelected(new Set());
     setFocusPath(null);
     setRenamingPath(null);
     setCreatingFolder(false);
-    setFilter("");
   }, []);
   const canBack = history.index > 0;
   const canForward = history.index < history.stack.length - 1;
   const go = (delta: number) => {
     setHistory((h) => ({ ...h, index: Math.max(0, Math.min(h.stack.length - 1, h.index + delta)) }));
+    setPage("files");
     setSelected(new Set());
   };
 
@@ -70,13 +77,10 @@ export function MainScreen() {
 
   // ---- 보기·정렬·필터 ----
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebar = useSidebarWidth();
   const [view, setView] = useState<ViewMode>("list");
   const [sort, setSort] = useState<Sort>({ key: "name", dir: "asc" });
-  const [filter, setFilter] = useState("");
-  // 검색어가 있으면 현재 폴더와 하위 폴더 전체에서 이름으로 찾는다
-  const search = useRecursiveSearch(loc.libId, loc.path, filter);
-  const searching = filter.trim() !== "";
-  const entries = useMemo(() => orderEntries(searching ? search.results : (dir.data ?? []), sort), [searching, search.results, dir.data, sort]);
+  const entries = useMemo(() => orderEntries(dir.data ?? [], sort), [dir.data, sort]);
   const onSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
   // ---- 선택 (클릭 / Ctrl / Shift / 키보드) ----
@@ -139,6 +143,17 @@ export function MainScreen() {
   const [deleting, setDeleting] = useState<Entry[]>([]);
   const [sharing, setSharing] = useState<Entry | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  /** 메인 영역: 파일 탐색 또는 공유 링크 페이지. 어디로든 이동하면 파일 탐색으로 돌아온다 */
+  const [page, setPage] = useState<"files" | "links">("files");
+  useEffect(() => void checkForUpdate(), []); // 시작할 때 한 번 조용히 확인
+  const openLinks = () => {
+    setPage("links");
+    setSelected(new Set());
+  };
+  // 파일 목록의 공유 표시와 상태바 "링크 N개"용. 공유 링크 페이지와 같은 쿼리 키라 캐시를 같이 쓴다
+  const shareLinks = useQuery({ queryKey: ["share-links"], queryFn: () => storage.listShareLinks() });
+  const sharedPaths = useMemo(() => new Set((shareLinks.data ?? []).filter((l) => l.libId === loc.libId).map((l) => l.path)), [shareLinks.data, loc.libId]);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const previewable = entries.filter((e) => e.type === "file" && previewKind(e.name) !== null);
   const previewIndex = previewable.findIndex((e) => e.path === previewPath);
@@ -158,6 +173,7 @@ export function MainScreen() {
 
   // ---- 키보드 ----
   const listRef = useRef<HTMLDivElement>(null);
+  const marquee = useMarquee(listRef, selected, setSelected);
   function onKeyDown(e: React.KeyboardEvent) {
     if (renamingPath || creatingFolder || (e.target as HTMLElement).tagName === "INPUT") return;
     const idx = entries.findIndex((x) => x.path === focusPath);
@@ -188,9 +204,9 @@ export function MainScreen() {
 
   const listProps = {
     entries,
+    sharedPaths,
     sort,
     onSort,
-    locationRoot: searching ? loc.path : null,
     selected,
     focusPath,
     onSelect: select,
@@ -239,33 +255,51 @@ export function MainScreen() {
           canUp: loc.libId !== null && loc.path !== "/",
           logout,
           settings: () => setSettingsOpen(true),
+          trash: () => setTrashOpen(true),
+          shareLinks: openLinks,
         }}
-        crumbs={crumbs}
+        crumbs={page === "links" ? [{ label: "공유 링크", path: loc.path }] : crumbs}
         onNavigate={(path) => setLoc({ ...loc, path })}
-        filter={filter}
-        onFilter={setFilter}
-        accountLabel={session.connection.baseUrl.replace(/^https?:\/\//, "")}
-        disabled={!loc.libId}
+        onSearchPick={(libId, e) => {
+          // 폴더는 안으로, 파일은 그 폴더로 가서 해당 파일을 선택
+          if (e.type === "dir") setLoc({ libId, path: e.path });
+          else {
+            setLoc({ libId, path: parentPath(e.path) });
+            setSelected(new Set([e.path]));
+            setFocusPath(e.path);
+          }
+        }}
+        disabled={!loc.libId || page !== "files"}
       />
 
       <div className="flex min-h-0 flex-1">
         {sidebarOpen && (
-          <Sidebar
-            libraries={libs.data}
-            loc={loc}
-            onNavigate={setLoc}
-            onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
-            onRenameFolder={(libId, path, newName) =>
-              renameFolder.mutate({ libId, path, newName }, {
-                onSuccess: () => {
-                  // 보고 있던 위치가 이름 바뀐 폴더 안이면 새 경로로 옮긴다
-                  if (loc.libId === libId && (loc.path === path || loc.path.startsWith(path + "/"))) {
-                    setLoc({ libId, path: joinPath(parentPath(path), newName) + loc.path.slice(path.length) });
-                  }
-                },
-              })
-            }
-          />
+          <>
+            <Sidebar
+              width={sidebar.width}
+              onTrash={() => setTrashOpen(true)}
+              page={page}
+              onShareLinks={openLinks}
+              libraries={libs.data}
+              loc={loc}
+              onNavigate={setLoc}
+              onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
+              onRenameFolder={(libId, path, newName) =>
+                renameFolder.mutate({ libId, path, newName }, {
+                  onSuccess: () => {
+                    // 보고 있던 위치가 이름 바뀐 폴더 안이면 새 경로로 옮긴다
+                    if (loc.libId === libId && (loc.path === path || loc.path.startsWith(path + "/"))) {
+                      setLoc({ libId, path: joinPath(parentPath(path), newName) + loc.path.slice(path.length) });
+                    }
+                  },
+                })
+              }
+            />
+            {/* 사이드바 오른쪽 경계 위 4px 끌기 영역. 표 머리글의 열 조절과 같은 모양 */}
+            <div role="separator" aria-orientation="vertical" onPointerDown={sidebar.startResize} className="group relative z-10 -ml-1 w-1 shrink-0 cursor-col-resize">
+              <div className="absolute inset-y-0 right-0 w-px group-hover:bg-primary group-active:bg-primary" />
+            </div>
+          </>
         )}
 
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -275,28 +309,47 @@ export function MainScreen() {
           {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
           {ops.error && <ErrorBanner message={`${ops.error.message} (${ops.error.detail})`} actionLabel="닫기" onRetry={ops.error.reset} />}
 
+          {page === "links" ? (
+            <ShareLinksPage />
+          ) : (
+            <>
           <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
             <div
               ref={listRef}
               tabIndex={0}
               onKeyDown={onKeyDown}
+              onPointerDown={marquee.onPointerDown}
+              onClickCapture={marquee.onClickCapture}
               onClick={(e) => e.target === e.currentTarget && setSelected(new Set())}
-              className="min-h-0 flex-1 overflow-auto outline-none"
+              className="relative min-h-0 flex-1 overflow-auto outline-none"
             >
               {loc.libId === null ? (
                 <Empty text="왼쪽에서 저장소를 선택하세요" />
-              ) : dir.isLoading && !searching ? (
+              ) : dir.isLoading ? (
                 <FileListSkeleton />
               ) : entries.length === 0 && !creatingFolder ? (
-                <Empty text={searching ? (search.done ? `'${filter.trim()}'와 일치하는 항목이 없습니다` : "검색 중…") : "비어 있는 폴더입니다. 파일을 끌어다 놓으세요"} />
+                <Empty text="비어 있는 폴더입니다. 파일을 끌어다 놓으세요" />
               ) : view === "grid" ? (
                 <IconGrid {...listProps} />
               ) : (
                 <FileList {...listProps} />
               )}
+              {marquee.rect && <div className="pointer-events-none absolute border border-primary/60 bg-primary/10" style={marquee.rect} />}
             </div>
           </DropZone>
+          <FileSelectionBar
+            count={selectedEntries.length}
+            hasFile={selectedEntries.some((e) => e.type === "file")}
+            onDownload={() => ops.download.mutate(selectedEntries)}
+            onShare={() => selectedEntries[0] && setSharing(selectedEntries[0])}
+            onRename={() => selectedEntries[0] && setRenamingPath(selectedEntries[0].path)}
+            onDelete={() => setDeleting(selectedEntries)}
+            onClear={() => setSelected(new Set())}
+          />
+            </>
+          )}
           <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
+            <UpdateNotice />
             <DownloadPanel />
             <UploadPanel />
           </div>
@@ -304,8 +357,8 @@ export function MainScreen() {
       </div>
 
       <StatusBar
-        itemCount={searching ? null : dir.data ? dir.data.length : null}
-        note={searching ? `검색 결과 ${search.results.length}개 · 폴더 ${search.scanned}개 확인${search.done ? "" : " 중…"}${search.truncated ? " (폴더가 많아 일부만 검색)" : ""}` : undefined}
+        itemCount={page === "files" && dir.data ? dir.data.length : null}
+        note={page === "links" ? (shareLinks.data ? `링크 ${shareLinks.data.length}개` : "") : undefined}
         selectedCount={selectedEntries.length}
         selectedBytes={selectedEntries.reduce((a, e) => a + e.size, 0)}
       />
@@ -315,6 +368,7 @@ export function MainScreen() {
       )}
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <TrashDialog libId={loc.libId} open={trashOpen} onClose={() => setTrashOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog
         entries={deleting}

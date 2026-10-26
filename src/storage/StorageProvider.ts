@@ -4,6 +4,8 @@ export interface Library {
   size: number;
   mtime: number;
   encrypted: boolean;
+  /** 내용이 바뀔 때마다 달라지는 서버 식별자. 검색 인덱스 갱신 판단용 */
+  headCommitId?: string;
 }
 
 export interface Entry {
@@ -37,6 +39,35 @@ export interface ShareLink {
   expiresAt?: number;
 }
 
+/** 내가 만든 공유 링크 */
+export interface ShareLinkInfo {
+  /** 삭제에 쓰는 서버 식별자 */
+  token: string;
+  url: string;
+  libId: string;
+  libName: string;
+  path: string;
+  name: string;
+  type: "file" | "dir";
+  expiresAt?: number;
+  expired: boolean;
+  /** 비밀번호가 걸려 있음 */
+  protected: boolean;
+  views: number;
+  createdAt: number;
+}
+
+/** 휴지통 항목. 복구하면 parentDir로 돌아간다 */
+export interface TrashEntry {
+  name: string;
+  type: "file" | "dir";
+  size: number;
+  parentDir: string;
+  deletedAt: number;
+  /** 복구에 필요한 서버 식별자 (Seafile: 삭제 커밋 id) */
+  commitId: string;
+}
+
 export type StorageErrorKind = "unauthorized" | "notFound" | "network" | "server";
 
 export class StorageError extends Error {
@@ -67,6 +98,8 @@ export interface StorageProvider {
   listLibraries(): Promise<Library[]>;
   renameLibrary(libId: string, newName: string): Promise<void>;
   listDir(libId: string, path: string): Promise<Entry[]>;
+  /** 저장소 전체의 파일·폴더를 한 번에(검색 인덱스용) */
+  listTree(libId: string): Promise<Entry[]>;
 
   upload(
     libId: string,
@@ -88,4 +121,12 @@ export interface StorageProvider {
     path: string,
     opts?: { password?: string; expireDays?: number },
   ): Promise<ShareLink>;
+
+  listShareLinks(): Promise<ShareLinkInfo[]>;
+  deleteShareLink(token: string): Promise<void>;
+
+  listTrash(libId: string): Promise<TrashEntry[]>;
+  restoreTrash(libId: string, entry: TrashEntry): Promise<void>;
+  /** 항목별 영구 삭제는 Seafile이 지원하지 않아 저장소 휴지통 전체를 비운다 */
+  emptyTrash(libId: string): Promise<void>;
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { checkForUpdate } from "./updater";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Menubar, MenubarCheckboxItem, MenubarContent, MenubarItem, MenubarMenu, MenubarRadioGroup, MenubarRadioItem, MenubarSeparator, MenubarShortcut, MenubarSub, MenubarSubContent, MenubarSubTrigger, MenubarTrigger } from "@/components/ui/menubar";
@@ -32,6 +33,8 @@ export interface MenuActions {
   canUp: boolean;
   logout(): void;
   settings(): void;
+  trash(): void;
+  shareLinks(): void;
 }
 
 const MOD = modKey();
@@ -54,12 +57,18 @@ export function MenuBar(a: MenuActions) {
             <MenubarItem onClick={a.upload} className={item}>
               파일 업로드…
             </MenubarItem>
+            <MenubarItem onClick={a.trash} className={item}>
+              휴지통…
+            </MenubarItem>
             <MenubarSeparator />
             <MenubarItem disabled={!a.selection.hasFile} onClick={a.download} className={item}>
               다운로드
             </MenubarItem>
             <MenubarItem disabled={a.selection.count !== 1} onClick={a.share} className={item}>
               공유 링크…
+            </MenubarItem>
+            <MenubarItem onClick={a.shareLinks} className={item}>
+              공유 링크 관리…
             </MenubarItem>
             <MenubarItem disabled={a.selection.count !== 1} onClick={a.rename} className={item}>
               이름 변경<MenubarShortcut>F2</MenubarShortcut>
@@ -160,6 +169,9 @@ export function MenuBar(a: MenuActions) {
             <MenubarItem onClick={() => setDialog("shortcuts")} className={item}>
               키보드 단축키
             </MenubarItem>
+            <MenubarItem onClick={() => void checkForUpdate(true)} className={item}>
+              업데이트 확인…
+            </MenubarItem>
             <MenubarItem onClick={() => setDialog("about")} className={item}>
               Drive 정보
             </MenubarItem>
@@ -205,7 +217,11 @@ export function MenuBar(a: MenuActions) {
             <DialogTitle>Drive</DialogTitle>
             <DialogDescription>버전 {pkg.version}</DialogDescription>
           </DialogHeader>
-          <p className="text-xs text-muted-foreground">개인 서버용 파일 탐색기. Tauri · React로 만들었습니다.</p>
+          <p className="text-xs text-muted-foreground">
+            Seafile 서버를 백엔드로 쓰는 커스텀 파일 탐색기입니다.
+            <br />
+            Seafile 웹 API 위에 데스크톱 앱(Tauri · React)으로 만들었습니다.
+          </p>
           <div className="flex justify-end">
             <Button size="sm" onClick={() => setDialog(null)}>
               확인

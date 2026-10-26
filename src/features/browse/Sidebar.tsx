@@ -1,4 +1,4 @@
-import { IconChevronDown, IconChevronRight, IconCloud, IconFolder, IconLock, IconPencil } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronRight, IconCloud, IconFolder, IconLink, IconLock, IconPencil, IconTrash } from "@tabler/icons-react";
 import { cn } from "cn";
 import { useState, type ReactNode } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -12,6 +12,12 @@ interface Props {
   onNavigate(loc: Location): void;
   onRenameLibrary(lib: Library, newName: string): void;
   onRenameFolder(libId: string, path: string, newName: string): void;
+  width: number;
+  /** 현재 저장소의 휴지통 열기 */
+  onTrash(): void;
+  /** 메인 영역에 무엇이 떠 있는지. 파일 탐색이 아니면 저장소 행을 선택 표시하지 않는다 */
+  page: "files" | "links";
+  onShareLinks(): void;
 }
 
 /** 이름 변경 중인 대상: 저장소는 "lib:<id>", 폴더는 "dir:<libId>:<path>" */
@@ -24,12 +30,12 @@ interface Ctx {
 }
 
 /** macOS 소스 리스트 스타일: 연회색, 11px 섹션 라벨, 28px 행, 선택은 옅은 파란 틴트 */
-export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onRenameFolder }: Props) {
+export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onRenameFolder, width, onTrash, page, onShareLinks }: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const names = libraries?.map((l) => l.name) ?? [];
   const ctx: Ctx = { loc, onNavigate, renaming, setRenaming, onRenameFolder };
   return (
-    <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pt-2 pb-2">
+    <aside style={{ width }} className="flex shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pt-2 pb-2">
       <div className="mb-1 px-2 pt-1 text-2xs font-medium text-muted-foreground">내 저장소</div>
       {libraries?.map((lib) => {
         if (lib.encrypted) return <Row key={lib.id} root depth={0} icon={<IconLock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />;
@@ -52,13 +58,17 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onRenameF
             ) : (
               <WithRenameMenu onRename={() => setRenaming(`lib:${lib.id}`)}>
                 {/* 저장소 = 드라이브 루트. 접고 펼치지 않고, 선택된 저장소 아래에만 폴더 트리 */}
-                <Row root depth={0} icon={<IconCloud className="size-4" />} label={lib.name} selected={active && loc.path === "/"} onClick={() => onNavigate({ libId: lib.id, path: "/" })} />
+                <Row root depth={0} icon={<IconCloud className="size-4" />} label={lib.name} selected={page === "files" && active && loc.path === "/"} onClick={() => onNavigate({ libId: lib.id, path: "/" })} />
               </WithRenameMenu>
             )}
             {active && <DirChildren libId={lib.id} path="/" depth={0} ctx={ctx} />}
           </div>
         );
       })}
+      <div className="mt-auto border-t border-sidebar-border pt-2">
+        <Row root depth={0} icon={<IconLink className="size-4" />} label="공유 링크" selected={page === "links"} onClick={onShareLinks} />
+        <Row root depth={0} icon={<IconTrash className="size-4" />} label="휴지통" disabled={loc.libId === null} title={loc.libId === null ? "저장소를 먼저 선택하세요" : undefined} onClick={onTrash} />
+      </div>
     </aside>
   );
 }

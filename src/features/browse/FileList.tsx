@@ -1,10 +1,12 @@
-import { IconArrowDown, IconArrowUp, IconFile, IconFileZip, IconFileMusic, IconCode, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconFile, IconFileZip, IconFileMusic, IconCode, IconLink, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
 import { cn } from "cn";
+import type { ReactNode } from "react";
 import { formatDateLong, formatSize } from "@/lib/format";
 import type { Entry } from "@/storage/StorageProvider";
 import { EntryContextMenu, type EntryMenuActions } from "./ContextMenu";
 import { InlineName } from "./InlineName";
 import { useColumnWidths, type ColKey } from "./useColumnWidths";
+import { useShellIcon } from "./useShellIcon";
 
 export type ViewMode = "list" | "grid";
 export type SortKey = "name" | "mtime" | "size";
@@ -32,24 +34,30 @@ const ICONS: Record<string, typeof IconFile> = {
   js: IconCode, ts: IconCode, tsx: IconCode, jsx: IconCode, py: IconCode, rs: IconCode, go: IconCode, json: IconCode, html: IconCode, css: IconCode, sh: IconCode,
 };
 
-/** 검색 결과의 위치: 기준 폴더 아래 상대 경로 ("· 문서/2025"), 기준 폴더 바로 아래면 "· 이 폴더" */
-export function locationLabel(root: string, path: string): string {
-  const parent = path.slice(0, path.lastIndexOf("/")) || "/";
-  const rel = parent === root ? "" : parent.slice(root === "/" ? 1 : root.length + 1);
-  return rel ? `· ${rel}` : "· 이 폴더";
+/** 공유 링크가 있는 항목의 아이콘 모서리 배지(탐색기의 공유 오버레이처럼) */
+export function SharedBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn("absolute flex size-4 items-center justify-center rounded-full bg-card shadow-item", className)} aria-label="공유 링크 있음">
+      <IconLink className="size-2.5 text-primary" stroke={2.5} />
+    </span>
+  );
 }
 
-export function EntryIcon({ entry, className }: { entry: Entry; className?: string }) {
+/** 윈도우 Tauri면 셸 아이콘(img), 아니면 SVG. fallback은 셸 아이콘이 없을 때 폴더 대신 그릴 것(그리드의 FolderGlyph) */
+export function EntryIcon({ entry, className, size = 16, fallback }: { entry: Entry; className?: string; size?: 16 | 48; fallback?: ReactNode }) {
+  const shell = useShellIcon(entry, size);
+  if (shell) return <img src={shell} alt="" draggable={false} className={cn("size-4 shrink-0", className)} />;
+  if (fallback) return <>{fallback}</>;
   if (entry.type === "dir") return <IconFolder className={cn("size-4 fill-primary/20 text-primary", className)} />;
   const ext = entry.name.split(".").pop()?.toLowerCase() ?? "";
-  const Icon = ICONS[ext] ?? File;
+  const Icon = ICONS[ext] ?? IconFile;
   return <Icon className={cn("size-4 text-muted-foreground", className)} stroke={1.75} />;
 }
 
 export interface ListProps {
   entries: Entry[];
-  /** 검색 결과일 때 기준 폴더. 각 항목의 상위 위치를 이 기준으로 보여 준다 */
-  locationRoot?: string | null;
+  /** 공유 링크가 있는 항목의 경로. 이름 옆(목록)·아이콘 모서리(그리드)에 표시 */
+  sharedPaths?: Set<string>;
   sort: Sort;
   onSort(key: SortKey): void;
   selected: Set<string>;
@@ -68,17 +76,24 @@ export interface ListProps {
 
 /** 표 보기: 24px 머리글, 28px 행, 줄무늬, 전체 행 선택 */
 export function FileList(p: ListProps) {
-  const { widths, startResize } = useColumnWidths();
+  const { widths, startResize } = useColumnWidths<ColKey>("seadrive.columns", { mtime: 176, size: 96 }, { mtime: 90, size: 64 });
   return (
     <table className="w-full table-fixed border-collapse text-sm">
       <colgroup>
         <col />
+        <col style={{ width: 32 }} />
         <col style={{ width: widths.mtime }} />
         <col style={{ width: widths.size }} />
       </colgroup>
       <thead className="sticky top-0 z-10 bg-background">
         <tr className="h-7 border-b border-border text-2xs text-muted-foreground">
-          <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" resize="mtime" onResize={startResize} />
+          <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" />
+          <th aria-label="공유" className="relative">
+            {/* 열 조절 핸들은 공유 열 오른쪽(수정일 앞)에 둔다 */}
+            <span role="separator" aria-orientation="vertical" onPointerDown={(e) => startResize("mtime", e)} className="group absolute top-0 right-0 bottom-0 z-20 w-2 translate-x-1/2 cursor-col-resize">
+              <span className="absolute top-1.5 bottom-1.5 left-1/2 w-px bg-border group-hover:bg-primary" />
+            </span>
+          </th>
           <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} className="pl-3" resize="size" onResize={startResize} />
           <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="pr-3 pl-3 text-right" />
         </tr>
@@ -86,7 +101,7 @@ export function FileList(p: ListProps) {
       <tbody>
         {p.creatingFolder && (
           <tr className="h-8.5">
-            <td className="pl-3" colSpan={3}>
+            <td className="pl-3" colSpan={4}>
               <span className="flex items-center gap-2">
                 <IconFolder className="size-4 fill-primary/20 text-primary" />
                 <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-sm md:text-sm" />
@@ -121,10 +136,14 @@ export function FileList(p: ListProps) {
                   ) : (
                     <span className="truncate">{e.name}</span>
                   )}
-                  {p.locationRoot != null && p.renamingPath !== e.path && (
-                    <span className="truncate text-2xs text-muted-foreground">{locationLabel(p.locationRoot, e.path)}</span>
-                  )}
                 </span>
+              </td>
+              <td>
+                {p.sharedPaths?.has(e.path) && (
+                  <span className="flex items-center justify-center">
+                    <IconLink className="size-4 text-success" stroke={2} aria-label="공유 링크 있음" />
+                  </span>
+                )}
               </td>
               <td className="truncate pl-3 text-muted-foreground">{formatDateLong(e.mtime)}</td>
               <td className="truncate pr-3 pl-3 text-right text-muted-foreground tabular-nums">{e.type === "file" ? formatSize(e.size) : ""}</td>

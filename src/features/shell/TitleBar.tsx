@@ -1,10 +1,11 @@
-import { IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebar, IconList, IconLogout, IconRefresh, IconSearch, IconSettings, IconUpload, IconUser } from "@tabler/icons-react";
+import { IconArrowUp, IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebar, IconList, IconRefresh, IconUpload } from "@tabler/icons-react";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { CloudMark } from "@/components/ui/cloud-mark";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SearchBox } from "@/features/search/SearchBox";
+import type { Entry } from "@/storage/StorageProvider";
 import { MenuBar, type MenuActions } from "./MenuBar";
 import { isMac, isTauri, modKey, showWindowControls } from "./platform";
 import { WindowControls } from "./WindowControls";
@@ -18,10 +19,7 @@ interface Props {
   menu: MenuActions;
   crumbs: Crumb[];
   onNavigate(path: string): void;
-  filter: string;
-  onFilter(v: string): void;
-  accountLabel: string;
-  accountSub?: string;
+  onSearchPick(libId: string, entry: Entry): void;
   disabled?: boolean;
 }
 
@@ -29,7 +27,7 @@ interface Props {
  * 창 상단 두 줄: [메뉴바 + 드래그 영역 + 창 버튼] / [툴바].
  * VS Code·Windows Files 앱과 같은 구조. 빈 영역은 창 드래그.
  */
-export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accountLabel, accountSub, disabled }: Props) {
+export function TitleBar({ menu: m, crumbs, onNavigate, onSearchPick, disabled }: Props) {
   const drag = isTauri() ? { "data-tauri-drag-region": true } : {};
   return (
     <div className="shrink-0 select-none border-b border-border bg-titlebar">
@@ -51,8 +49,12 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
         <IconBtn label="앞으로" shortcut="Alt+→" onClick={m.forward} disabled={!m.canForward}>
           <IconChevronRight className="size-4" stroke={1.75} />
         </IconBtn>
+        <IconBtn label="위로" shortcut="Backspace" onClick={m.up} disabled={!m.canUp}>
+          <IconArrowUp className="size-4" stroke={1.75} />
+        </IconBtn>
 
         <div {...drag} className="mx-1 flex h-7 min-w-0 flex-1 items-center gap-0.5 overflow-hidden rounded-md border border-border bg-background px-1.5 text-sm">
+          <CloudMark className="mr-1 size-4 shrink-0" />
           {crumbs.map((c, i) => {
             const last = i === crumbs.length - 1;
             return (
@@ -70,10 +72,7 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
           })}
         </div>
 
-        <div className="relative mx-1 w-52 shrink-0">
-          <IconSearch className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" stroke={1.75} />
-          <Input value={filter} onChange={(e) => onFilter(e.target.value)} onKeyDown={(e) => e.key === "Escape" && onFilter("")} placeholder="이 폴더와 하위 폴더 검색" disabled={disabled} className="h-7 rounded-md pl-7 text-sm md:text-sm" />
-        </div>
+        <SearchBox onPick={onSearchPick} disabled={disabled} />
 
         <div className="mx-1 flex h-7 shrink-0 items-center rounded-md border border-border bg-background p-0.5">
           <IconBtn label="목록" onClick={() => m.setView("list")} active={m.view === "list"} size="xs">
@@ -94,26 +93,6 @@ export function TitleBar({ menu: m, crumbs, onNavigate, filter, onFilter, accoun
           <IconUpload className="size-3.5" stroke={2} /> 업로드
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="mr-1 size-7 rounded-md text-muted-foreground" />}>
-            <IconUser className="size-4" stroke={1.75} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>
-                <div className="font-medium">{accountLabel}</div>
-                {accountSub && <div className="text-2xs font-normal text-muted-foreground">{accountSub}</div>}
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={m.settings}>
-              <IconSettings className="size-4" stroke={1.75} /> 설정…
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={m.logout}>
-              <IconLogout className="size-4" stroke={1.75} /> 로그아웃
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );

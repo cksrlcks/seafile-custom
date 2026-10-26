@@ -39,6 +39,13 @@ describe("SeafileApi", () => {
     expect((fetchMock.mock.calls[0][1] as RequestInit).redirect).toBe("manual");
   });
 
+  it("uses error_msg from a JSON error body as the message", async () => {
+    fetchMock.mockResolvedValue(new Response('{"error_msg": "Password is too short."}', { status: 400 }));
+    const err = (await api().postForm("/api/v2.1/share-links/", { path: "/a" }).catch((e) => e)) as StorageError;
+    expect(err.message).toBe("Password is too short.");
+    expect(err.status).toBe(400);
+  });
+
   it("maps fetch failure to network", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     const err = (await api().get("/api2/repos/").catch((e) => e)) as StorageError;

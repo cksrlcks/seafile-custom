@@ -43,11 +43,21 @@ export class SeafileApi {
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       const kind = res.status === 401 ? "unauthorized" : res.status === 404 ? "notFound" : "server";
-      const err = new StorageError(kind, text || res.statusText, res.status);
+      const err = new StorageError(kind, errorMessage(text) || res.statusText, res.status);
       if (res.headers.get("X-Seafile-OTP") === "required") err.message = "otp required";
       throw err;
     }
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;
+  }
+}
+
+/** Seahub 오류 본문 {"error_msg": "..."} 에서 사람이 읽을 문장만. JSON이 아니면 원문 그대로 */
+function errorMessage(text: string): string {
+  try {
+    const j = JSON.parse(text) as { error_msg?: string; error?: string; detail?: string };
+    return j.error_msg || j.error || j.detail || text;
+  } catch {
+    return text;
   }
 }

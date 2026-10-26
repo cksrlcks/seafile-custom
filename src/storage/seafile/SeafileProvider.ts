@@ -1,12 +1,15 @@
-import { StorageError, type Account, type Entry, type Library, type ShareLink, type StorageProvider, type UploadTask } from "../StorageProvider";
+import { StorageError, type Account, type Entry, type Library, type ShareLink, type ShareLinkInfo, type StorageProvider, type TrashEntry, type UploadTask } from "../StorageProvider";
 import { joinPath } from "../path";
 import { SeafileApi } from "./api";
 import { CHUNK_SIZE, chunkRanges } from "./chunk";
 import { clearInterrupted, isInterrupted, markInterrupted } from "./resumeRegistry";
 import { xhrUpload } from "./xhrUpload";
 
-interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean }
+interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean; head_commit_id?: string }
 interface DirentDto { id: string; name: string; type: "file" | "dir"; size?: number; mtime: number }
+interface TreeDirentDto { type: "file" | "dir"; id: string; name: string; parent_dir: string; size?: number; mtime: string | number }
+interface ShareLinkDto { token: string; link: string; repo_id: string; repo_name: string; path: string; obj_name: string; is_dir: boolean; expire_date: string | null; is_expired: boolean; is_encrypted?: boolean; password?: string | null; view_cnt: number; ctime: string }
+interface TrashDto { obj_name: string; parent_dir: string; is_dir: boolean; size?: number; deleted_time: string; commit_id: string }
 
 function isLinkExpired(e: unknown): boolean {
   const status = (e as { status?: number }).status;
@@ -51,7 +54,7 @@ export class SeafileProvider implements StorageProvider {
 
   async listLibraries(): Promise<Library[]> {
     const repos = await this.api.get<RepoDto[]>("/api2/repos/");
-    return repos.map((r) => ({ id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted }));
+    return repos.map((r) => ({ id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted, headCommitId: r.head_commit_id }));
   }
 
   async renameLibrary(libId: string, newName: string): Promise<void> {
@@ -158,5 +161,62 @@ export class SeafileProvider implements StorageProvider {
     const res = await this.api.postForm<{ link: string; expire_date?: string }>("/api/v2.1/share-links/", form);
     const expiresAt = res.expire_date ? Date.parse(res.expire_date) / 1000 : undefined;
     return expiresAt && !Number.isNaN(expiresAt) ? { url: res.link, expiresAt } : { url: res.link };
+  }
+
+  async listTree(libId: string): Promise<Entry[]> {
+    // v2.1 dir API의 recursive=1: 요청 한 번에 전체 트리. mtime은 ISO 문자열로 온다
+    const r = await this.api.get<{ dirent_list: TreeDirentDto[] }>(`/api/v2.1/repos/${libId}/dir/`, { p: "/", recursive: "1" });
+    return r.dirent_list.map((d) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      size: d.size ?? 0,
+      mtime: typeof d.mtime === "number" ? d.mtime : Math.floor(Date.parse(d.mtime) / 1000) || 0,
+      path: joinPath(d.parent_dir, d.name),
+    }));
+  }
+
+  async listShareLinks(): Promise<ShareLinkInfo[]> {
+    const rows = await this.api.get<ShareLinkDto[]>("/api/v2.1/share-links/");
+    const sec = (iso: string | null) => (iso ? Math.floor(Date.parse(iso) / 1000) || undefined : undefined);
+    return rows.map((r) => ({
+      token: r.token,
+      url: r.link,
+      libId: r.repo_id,
+      libName: r.repo_name,
+      path: r.path,
+      name: r.obj_name,
+      type: r.is_dir ? "dir" : "file",
+      expiresAt: sec(r.expire_date),
+      expired: !!r.is_expired,
+      protected: !!r.is_encrypted || !!r.password, // 버전에 따라 is_encrypted 또는 password(소유자에게 보여 주는 값) 중 하나만 온다
+      views: r.view_cnt ?? 0,
+      createdAt: sec(r.ctime) ?? 0,
+    }));
+  }
+  async deleteShareLink(token: string): Promise<void> {
+    await this.api.delete(`/api/v2.1/share-links/${token}/`);
+  }
+
+  async listTrash(libId: string): Promise<TrashEntry[]> {
+    const out: TrashEntry[] = [];
+    let scanStat: string | undefined;
+    // 서버가 커밋을 훑으며 100개씩 준다. shortcut: 최대 10페이지(약 1000개)까지만, 더 필요하면 "더 보기"로
+    for (let i = 0; i < 10; i++) {
+      const r = await this.api.get<{ data: TrashDto[]; more: boolean; scan_stat?: string }>(`/api/v2.1/repos/${libId}/trash/`, scanStat ? { path: "/", scan_stat: scanStat } : { path: "/" });
+      for (const d of r.data) {
+        const deletedAt = Date.parse(d.deleted_time) / 1000;
+        out.push({ name: d.obj_name, type: d.is_dir ? "dir" : "file", size: d.size ?? 0, parentDir: d.parent_dir, deletedAt: Number.isNaN(deletedAt) ? 0 : deletedAt, commitId: d.commit_id });
+      }
+      if (!r.more || !r.scan_stat) break;
+      scanStat = r.scan_stat;
+    }
+    return out;
+  }
+  async restoreTrash(libId: string, e: TrashEntry): Promise<void> {
+    await this.api.postForm(`/api/v2.1/repos/${libId}/${e.type}/`, { operation: "revert", commit_id: e.commitId }, { p: joinPath(e.parentDir, e.name) });
+  }
+  async emptyTrash(libId: string): Promise<void> {
+    await this.api.delete(`/api/v2.1/repos/${libId}/trash/`, { keep_days: "0" });
   }
 }

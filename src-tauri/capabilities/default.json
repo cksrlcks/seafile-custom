@@ -16,6 +16,8 @@
     "dialog:allow-save",
     "dialog:allow-open",
     "upload:allow-download",
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

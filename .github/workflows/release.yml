@@ -1,0 +1,45 @@
+# v* 태그를 푸시하면 Windows 설치 파일을 빌드·서명해 GitHub Release로 올린다.
+# 릴리스에 latest.json이 함께 올라가고, 설치된 앱이 그걸 보고 자동 업데이트한다.
+# 필요한 시크릿: TAURI_SIGNING_PRIVATE_KEY (~/.tauri/seadrive.key 내용), TAURI_SIGNING_PRIVATE_KEY_PASSWORD (비워 둔 키면 빈 값)
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Drive v__VERSION__
+          releaseBody: 자동 빌드된 릴리스입니다.
+          releaseDraft: false
+          prerelease: false

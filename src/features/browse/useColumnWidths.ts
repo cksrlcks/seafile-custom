@@ -1,30 +1,30 @@
 import { useCallback, useState } from "react";
 
 export type ColKey = "mtime" | "size";
-const KEY = "seadrive.columns";
-const DEFAULT: Record<ColKey, number> = { mtime: 176, size: 96 };
-const MIN: Record<ColKey, number> = { mtime: 90, size: 64 };
 
-function load(): Record<ColKey, number> {
+function load<K extends string>(key: string, defaults: Record<K, number>): Record<K, number> {
   try {
-    return { ...DEFAULT, ...(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Record<ColKey, number>>) };
+    return { ...defaults, ...(JSON.parse(localStorage.getItem(key) ?? "{}") as Partial<Record<K, number>>) };
   } catch {
-    return DEFAULT;
+    return defaults;
   }
 }
 
-/** 표 열 너비. 이름 열은 남는 공간, 나머지는 px. 드래그로 조절하고 localStorage에 기억. */
-export function useColumnWidths() {
-  const [widths, setWidths] = useState(load);
+/**
+ * 표 열 너비. 첫 열은 남는 공간, 나머지는 px. 머리글 오른쪽 경계를 끌면 "다음 열"의 너비가 바뀐다(탐색기 방식).
+ * storageKey별로 localStorage에 기억. 파일 목록과 공유 링크 표가 각자 키로 쓴다.
+ */
+export function useColumnWidths<K extends string>(storageKey: string, defaults: Record<K, number>, mins: Record<K, number>) {
+  const [widths, setWidths] = useState<Record<K, number>>(() => load(storageKey, defaults));
 
   const startResize = useCallback(
-    (key: ColKey, e: React.PointerEvent) => {
+    (key: K, e: React.PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
       const startW = widths[key];
       const onMove = (ev: PointerEvent) => {
-        const w = Math.max(MIN[key], Math.round(startW - (ev.clientX - startX)));
+        const w = Math.max(mins[key], Math.round(startW - (ev.clientX - startX)));
         setWidths((s) => (s[key] === w ? s : { ...s, [key]: w }));
       };
       const onUp = () => {
@@ -32,7 +32,7 @@ export function useColumnWidths() {
         window.removeEventListener("pointerup", onUp);
         setWidths((s) => {
           try {
-            localStorage.setItem(KEY, JSON.stringify(s));
+            localStorage.setItem(storageKey, JSON.stringify(s));
           } catch {
             /* ignore */
           }
@@ -42,7 +42,7 @@ export function useColumnWidths() {
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [widths],
+    [widths, storageKey, mins],
   );
 
   return { widths, startResize };

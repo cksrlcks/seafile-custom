@@ -119,3 +119,70 @@ describe("SeafileProvider.getAccount", () => {
     expect(acc.name).toBe("me@x.com");
   });
 });
+
+describe("SeafileProvider trash", () => {
+  it("listTrash maps entries and follows scan_stat pages", async () => {
+    fetchMock
+      .mockResolvedValueOnce(json({ data: [{ obj_name: "a.txt", parent_dir: "/d", is_dir: false, size: 3, deleted_time: "2026-10-26T00:00:00+00:00", commit_id: "c1" }], more: true, scan_stat: "s1" }))
+      .mockResolvedValueOnce(json({ data: [{ obj_name: "sub", parent_dir: "/", is_dir: true, deleted_time: "2026-10-26T00:00:00+00:00", commit_id: "c2" }], more: false }));
+    const items = await new SeafileProvider("https://host.example", "t").listTrash("r");
+    expect(items).toEqual([
+      { name: "a.txt", type: "file", size: 3, parentDir: "/d", deletedAt: 1792972800, commitId: "c1" },
+      { name: "sub", type: "dir", size: 0, parentDir: "/", deletedAt: 1792972800, commitId: "c2" },
+    ]);
+    expect(fetchMock.mock.calls[1][0]).toContain("scan_stat=s1");
+  });
+
+  it("restoreTrash reverts a dir at its old path with the commit id", async () => {
+    fetchMock.mockResolvedValue(json("success"));
+    await new SeafileProvider("https://host.example", "t").restoreTrash("r", { name: "sub", type: "dir", size: 0, parentDir: "/d", deletedAt: 0, commitId: "c2" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api/v2.1/repos/r/dir/?p=%2Fd%2Fsub");
+    expect(String(init.body)).toBe("operation=revert&commit_id=c2");
+  });
+});
+
+describe("SeafileProvider listTree", () => {
+  it("flattens the recursive listing into absolute paths", async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        dirent_list: [
+          { type: "dir", id: "d1", name: "a", parent_dir: "/", mtime: "2026-10-26T00:00:00+00:00" },
+          { type: "file", id: "f1", name: "b.txt", parent_dir: "/a", size: 5, mtime: "2026-10-26T00:00:00+00:00" },
+        ],
+      }),
+    );
+    const tree = await new SeafileProvider("https://host.example", "t").listTree("r");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api/v2.1/repos/r/dir/?p=%2F&recursive=1");
+    expect(tree).toEqual([
+      { id: "d1", name: "a", type: "dir", size: 0, mtime: 1792972800, path: "/a" },
+      { id: "f1", name: "b.txt", type: "file", size: 5, mtime: 1792972800, path: "/a/b.txt" },
+    ]);
+  });
+});
+
+describe("SeafileProvider share links", () => {
+  it("listShareLinks maps rows", async () => {
+    fetchMock.mockResolvedValue(
+      json([{ token: "tk", link: "https://host.example/d/tk/", repo_id: "r", repo_name: "문서", path: "/a/b.txt", obj_name: "b.txt", is_dir: false, expire_date: null, is_expired: false, is_encrypted: true, view_cnt: 3, ctime: "2026-10-26T00:00:00+00:00" }]),
+    );
+    const links = await new SeafileProvider("https://host.example", "t").listShareLinks();
+    expect(links).toEqual([
+      { token: "tk", url: "https://host.example/d/tk/", libId: "r", libName: "문서", path: "/a/b.txt", name: "b.txt", type: "file", expiresAt: undefined, expired: false, protected: true, views: 3, createdAt: 1792972800 },
+    ]);
+  });
+
+  it("treats a password field as protected on servers without is_encrypted", async () => {
+    fetchMock.mockResolvedValue(json([{ token: "tk", link: "https://host.example/d/tk/", repo_id: "r", repo_name: "문서", path: "/a.txt", obj_name: "a.txt", is_dir: false, expire_date: null, is_expired: false, password: "secret-1234", view_cnt: 0, ctime: "2026-10-26T00:00:00+00:00" }]));
+    const [l] = await new SeafileProvider("https://host.example", "t").listShareLinks();
+    expect(l.protected).toBe(true);
+  });
+
+  it("deleteShareLink deletes by token", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 200 }));
+    await new SeafileProvider("https://host.example", "t").deleteShareLink("tk");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api/v2.1/share-links/tk/");
+    expect(init.method).toBe("DELETE");
+  });
+});
