@@ -9,6 +9,9 @@ import { OverwriteDialog, type OverwriteChoice } from "@/features/upload/Overwri
 import { planUploads } from "@/features/upload/planUploads";
 import { UploadPanel } from "@/features/upload/UploadPanel";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
+import { PreviewModal } from "@/features/preview/PreviewModal";
+import { previewKind } from "@/features/preview/previewKind";
+import { ShareDialog } from "@/features/share/ShareDialog";
 import { useSession } from "@/storage/StorageContext";
 import { baseName } from "@/storage/path";
 import type { Entry, UploadTask } from "@/storage/StorageProvider";
@@ -63,15 +66,21 @@ export function MainScreen() {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [deleting, setDeleting] = useState<Entry[]>([]);
+  const [sharing, setSharing] = useState<Entry | null>(null);
   const menuActions: EntryMenuActions = {
     onDownload: (e) => ops.download.mutate(e),
     onRename: (e) => setRenamingPath(e.path),
+    onShare: (e) => setSharing(e),
     onDelete: (e) => setDeleting([e]),
   };
 
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const previewable = (dir.data ?? []).filter((e) => e.type === "file" && previewKind(e.name) !== null);
+  const previewIndex = previewable.findIndex((e) => e.path === previewPath);
+
   function openFile(entry: Entry) {
-    // Task 10에서 미리보기로 연결. 지금은 다운로드.
-    ops.download.mutate(entry);
+    if (previewKind(entry.name)) setPreviewPath(entry.path);
+    else ops.download.mutate(entry);
   }
 
   function toggle(path: string) {
@@ -200,6 +209,17 @@ export function MainScreen() {
         <UploadPanel />
       </div>
 
+      {loc.libId && (
+        <PreviewModal
+          libId={loc.libId}
+          entries={previewable}
+          index={previewIndex}
+          onClose={() => setPreviewPath(null)}
+          onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)}
+          onDownload={(e) => ops.download.mutate(e)}
+        />
+      )}
+      {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog
         entries={deleting}
