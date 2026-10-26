@@ -92,8 +92,9 @@ export function LoginScreen() {
 
         <div className="flex flex-col gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
           <button type="button" onClick={() => setShowServer((v) => !v)} className="mx-auto flex items-center gap-1 rounded px-2 py-0.5 hover:text-foreground">
-            <span className="truncate">
-              서버 <span className="text-foreground">{host}</span>
+            <span className="flex items-center gap-2 truncate">
+              <span>서버</span>
+              <span className="text-foreground">{host}</span>
             </span>
             {showServer ? <IconChevronUp className="size-3.5" /> : <IconChevronDown className="size-3.5" />}
           </button>
