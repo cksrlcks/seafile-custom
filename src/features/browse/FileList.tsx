@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, File, FileArchive, FileAudio, FileCode, FileImage, FileSpreadsheet, FileText, FileVideo, Folder } from "lucide-react";
+import { IconArrowDown, IconArrowUp, IconFile, IconFileZip, IconFileMusic, IconCode, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
 import { cn } from "cn";
 import { formatDateLong, formatSize } from "@/lib/format";
 import type { Entry } from "@/storage/StorageProvider";
@@ -21,21 +21,21 @@ export function orderEntries(list: Entry[], sort: Sort): Entry[] {
   return [...dirs, ...files];
 }
 
-const ICONS: Record<string, typeof File> = {
-  png: FileImage, jpg: FileImage, jpeg: FileImage, gif: FileImage, webp: FileImage, svg: FileImage, bmp: FileImage, heic: FileImage,
-  mp4: FileVideo, mov: FileVideo, mkv: FileVideo, avi: FileVideo, webm: FileVideo,
-  mp3: FileAudio, wav: FileAudio, flac: FileAudio, m4a: FileAudio,
-  zip: FileArchive, "7z": FileArchive, rar: FileArchive, tar: FileArchive, gz: FileArchive,
-  xlsx: FileSpreadsheet, xls: FileSpreadsheet, csv: FileSpreadsheet,
-  txt: FileText, md: FileText, pdf: FileText, doc: FileText, docx: FileText, hwp: FileText,
-  js: FileCode, ts: FileCode, tsx: FileCode, jsx: FileCode, py: FileCode, rs: FileCode, go: FileCode, json: FileCode, html: FileCode, css: FileCode, sh: FileCode,
+const ICONS: Record<string, typeof IconFile> = {
+  png: IconPhoto, jpg: IconPhoto, jpeg: IconPhoto, gif: IconPhoto, webp: IconPhoto, svg: IconPhoto, bmp: IconPhoto, heic: IconPhoto,
+  mp4: IconMovie, mov: IconMovie, mkv: IconMovie, avi: IconMovie, webm: IconMovie,
+  mp3: IconFileMusic, wav: IconFileMusic, flac: IconFileMusic, m4a: IconFileMusic,
+  zip: IconFileZip, "7z": IconFileZip, rar: IconFileZip, tar: IconFileZip, gz: IconFileZip,
+  xlsx: IconFileSpreadsheet, xls: IconFileSpreadsheet, csv: IconFileSpreadsheet,
+  txt: IconFileText, md: IconFileText, pdf: IconFileText, doc: IconFileText, docx: IconFileText, hwp: IconFileText,
+  js: IconCode, ts: IconCode, tsx: IconCode, jsx: IconCode, py: IconCode, rs: IconCode, go: IconCode, json: IconCode, html: IconCode, css: IconCode, sh: IconCode,
 };
 
 export function EntryIcon({ entry, className }: { entry: Entry; className?: string }) {
-  if (entry.type === "dir") return <Folder className={cn("size-4 fill-primary/20 text-primary", className)} />;
+  if (entry.type === "dir") return <IconFolder className={cn("size-4 fill-primary/20 text-primary", className)} />;
   const ext = entry.name.split(".").pop()?.toLowerCase() ?? "";
   const Icon = ICONS[ext] ?? File;
-  return <Icon className={cn("size-4 text-muted-foreground", className)} strokeWidth={1.75} />;
+  return <Icon className={cn("size-4 text-muted-foreground", className)} stroke={1.75} />;
 }
 
 export interface ListProps {
@@ -59,9 +59,9 @@ export interface ListProps {
 /** 표 보기: 24px 머리글, 28px 행, 줄무늬, 전체 행 선택 */
 export function FileList(p: ListProps) {
   return (
-    <table className="w-full table-fixed border-collapse text-ui">
+    <table className="w-full table-fixed border-collapse text-sm">
       <thead className="sticky top-0 z-10 bg-background">
-        <tr className="h-6 border-b border-border text-ui-xs text-muted-foreground">
+        <tr className="h-6 border-b border-border text-2xs text-muted-foreground">
           <Th label="이름" k="name" sort={p.sort} onSort={p.onSort} className="pl-3" />
           <Th label="수정일" k="mtime" sort={p.sort} onSort={p.onSort} className="w-44" />
           <Th label="크기" k="size" sort={p.sort} onSort={p.onSort} className="w-24 pr-3 text-right" />
@@ -72,8 +72,8 @@ export function FileList(p: ListProps) {
           <tr className="h-7">
             <td className="pl-3" colSpan={3}>
               <span className="flex items-center gap-2">
-                <Folder className="size-4 fill-primary/20 text-primary" />
-                <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-ui md:text-ui" />
+                <IconFolder className="size-4 fill-primary/20 text-primary" />
+                <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-sm md:text-sm" />
               </span>
             </td>
           </tr>
@@ -101,7 +101,7 @@ export function FileList(p: ListProps) {
                 <span className="flex items-center gap-2">
                   <EntryIcon entry={e} />
                   {p.renamingPath === e.path ? (
-                    <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 max-w-sm text-ui md:text-ui" />
+                    <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 max-w-sm text-sm md:text-sm" />
                   ) : (
                     <span className="truncate">{e.name}</span>
                   )}
@@ -123,7 +123,7 @@ function Th({ label, k, sort, onSort, className }: { label: string; k: SortKey; 
     <th className={cn("cursor-default text-left font-normal select-none hover:bg-accent", className)} onClick={() => onSort(k)}>
       <span className="inline-flex items-center gap-1">
         {label}
-        {active && (sort.dir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
+        {active && (sort.dir === "asc" ? <IconArrowUp className="size-3" /> : <IconArrowDown className="size-3" />)}
       </span>
     </th>
   );

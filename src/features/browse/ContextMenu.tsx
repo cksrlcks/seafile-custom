@@ -1,4 +1,4 @@
-import { Download, Link, Pencil, Trash2 } from "lucide-react";
+import { IconDownload, IconLink, IconPencil, IconTrash } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { ContextMenu as Root, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Entry } from "@/storage/StorageProvider";
@@ -31,25 +31,25 @@ export function EntryContextMenu({ entry, actions, children, asRow, className, o
     <Root>
       <ContextMenuTrigger render={trigger}>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-44">
-        <ContextMenuItem onClick={() => actions.onOpen(entry)} className="text-ui">
+        <ContextMenuItem onClick={() => actions.onOpen(entry)} className="text-sm">
           열기
           <ContextMenuShortcut>Enter</ContextMenuShortcut>
         </ContextMenuItem>
         {entry.type === "file" && (
-          <ContextMenuItem onClick={() => actions.onDownload(entry)} className="text-ui">
-            <Download className="size-4" /> 다운로드
+          <ContextMenuItem onClick={() => actions.onDownload(entry)} className="text-sm">
+            <IconDownload className="size-4" /> 다운로드
           </ContextMenuItem>
         )}
-        <ContextMenuItem onClick={() => actions.onRename(entry)} className="text-ui">
-          <Pencil className="size-4" /> 이름 변경
+        <ContextMenuItem onClick={() => actions.onRename(entry)} className="text-sm">
+          <IconPencil className="size-4" /> 이름 변경
           <ContextMenuShortcut>F2</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem disabled={!actions.onShare} onClick={() => actions.onShare?.(entry)} className="text-ui">
-          <Link className="size-4" /> 공유 링크
+        <ContextMenuItem disabled={!actions.onShare} onClick={() => actions.onShare?.(entry)} className="text-sm">
+          <IconLink className="size-4" /> 공유 링크
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => actions.onDelete(entry)} className="text-ui">
-          <Trash2 className="size-4" /> 삭제
+        <ContextMenuItem variant="destructive" onClick={() => actions.onDelete(entry)} className="text-sm">
+          <IconTrash className="size-4" /> 삭제
           <ContextMenuShortcut>Del</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>

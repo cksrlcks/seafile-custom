@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import { IconChevronLeft, IconChevronRight, IconDownload, IconX } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -46,16 +46,16 @@ export function PreviewModal({ libId, entries, index, onClose, onNavigate, onDow
                 {index + 1} / {entries.length}
               </span>
               <Button variant="ghost" size="icon-sm" disabled={index === 0} onClick={() => onNavigate(index - 1)} title="이전">
-                <ChevronLeft className="size-4" />
+                <IconChevronLeft className="size-4" />
               </Button>
               <Button variant="ghost" size="icon-sm" disabled={index >= entries.length - 1} onClick={() => onNavigate(index + 1)} title="다음">
-                <ChevronRight className="size-4" />
+                <IconChevronRight className="size-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => onDownload(entry)}>
-                <Download className="size-4" /> 다운로드
+                <IconDownload className="size-4" /> 다운로드
               </Button>
               <Button variant="ghost" size="icon-sm" onClick={onClose} title="닫기 (Esc)">
-                <X className="size-4" />
+                <IconX className="size-4" />
               </Button>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/40">
@@ -106,7 +106,7 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
     return (
       <Fallback message="1MB 이상 텍스트는 미리보기하지 않습니다">
         <Button onClick={() => onDownload(entry)}>
-          <Download className="size-4" /> 다운로드
+          <IconDownload className="size-4" /> 다운로드
         </Button>
       </Fallback>
     );
@@ -122,7 +122,7 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
   return (
     <Fallback message="미리보기를 지원하지 않는 형식입니다">
       <Button onClick={() => onDownload(entry)}>
-        <Download className="size-4" /> 다운로드
+        <IconDownload className="size-4" /> 다운로드
       </Button>
     </Fallback>
   );

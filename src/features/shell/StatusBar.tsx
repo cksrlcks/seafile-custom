@@ -15,7 +15,7 @@ export function StatusBar({ itemCount, selectedCount, selectedBytes }: Props) {
   const acc = useQuery({ queryKey: ["account"], queryFn: () => storage.getAccount(), staleTime: 30_000 });
   const a = acc.data;
   return (
-    <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-sidebar px-3 text-ui-xs text-muted-foreground">
+    <div className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-sidebar px-3 text-2xs text-muted-foreground">
       <span>{itemCount === null ? "" : `${itemCount}개 항목`}</span>
       {selectedCount > 0 && (
         <span className="text-foreground">

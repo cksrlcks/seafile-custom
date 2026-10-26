@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Lock, Pencil } from "lucide-react";
+import { IconChevronDown, IconChevronRight, IconFolder, IconFolderOpen, IconLock, IconPencil } from "@tabler/icons-react";
 import { cn } from "cn";
 import { useState, type ReactNode } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -19,10 +19,10 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary }: Props) 
   const names = libraries?.map((l) => l.name) ?? [];
   return (
     <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pt-2 pb-2">
-      <div className="mb-1 px-2 pt-1 text-ui-xs font-medium text-muted-foreground">내 저장소</div>
+      <div className="mb-1 px-2 pt-1 text-2xs font-medium text-muted-foreground">내 저장소</div>
       {libraries?.map((lib) =>
         lib.encrypted ? (
-          <Row key={lib.id} depth={0} icon={<Lock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />
+          <Row key={lib.id} depth={0} icon={<IconLock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />
         ) : renamingId === lib.id ? (
           <div key={lib.id} className="my-px pl-6">
             <InlineName
@@ -33,7 +33,7 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary }: Props) 
                 onRenameLibrary(lib, n);
               }}
               onCancel={() => setRenamingId(null)}
-              className="h-7 text-ui md:text-ui"
+              className="h-7 text-sm md:text-sm"
             />
           </div>
         ) : (
@@ -42,8 +42,8 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary }: Props) 
               <LibraryNode lib={lib} loc={loc} onNavigate={onNavigate} />
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onClick={() => setRenamingId(lib.id)} className="text-ui">
-                <Pencil className="size-4" /> 이름 변경
+              <ContextMenuItem onClick={() => setRenamingId(lib.id)} className="text-sm">
+                <IconPencil className="size-4" /> 이름 변경
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
@@ -61,7 +61,7 @@ function LibraryNode({ lib, loc, onNavigate }: { lib: Library; loc: Location; on
     <>
       <Row
         depth={0}
-        icon={expanded ? <FolderOpen className="size-4" /> : <Folder className="size-4" />}
+        icon={expanded ? <IconFolderOpen className="size-4" /> : <IconFolder className="size-4" />}
         label={lib.name}
         selected={active && loc.path === "/"}
         chevron={expanded ? "down" : "right"}
@@ -93,7 +93,7 @@ function DirNode({ libId, path, name, depth, loc, onNavigate }: { libId: string;
   const expanded = open ?? ancestor;
   return (
     <>
-      <Row depth={depth} icon={<Folder className="size-4" />} label={name} selected={selected} chevron={expanded ? "down" : "right"} onChevron={() => setOpen(!expanded)} onClick={() => onNavigate({ libId, path })} />
+      <Row depth={depth} icon={<IconFolder className="size-4" />} label={name} selected={selected} chevron={expanded ? "down" : "right"} onChevron={() => setOpen(!expanded)} onClick={() => onNavigate({ libId, path })} />
       {expanded && <DirChildren libId={libId} path={path} depth={depth + 1} loc={loc} onNavigate={onNavigate} />}
     </>
   );
@@ -107,7 +107,7 @@ function Row({ depth, icon, label, selected, disabled, title, chevron, onChevron
       title={title ?? label}
       onClick={disabled ? undefined : onClick}
       className={cn(
-        "my-px flex h-7 cursor-default items-center gap-1.5 rounded-md pr-2 text-ui text-foreground",
+        "my-px flex h-7 cursor-default items-center gap-1.5 rounded-md pr-2 text-sm text-foreground",
         !disabled && !selected && "hover:bg-sidebar-accent",
         selected && "bg-selection",
         disabled && "text-muted-foreground",
@@ -122,7 +122,7 @@ function Row({ depth, icon, label, selected, disabled, title, chevron, onChevron
           onChevron?.();
         }}
       >
-        {chevron === "down" ? <ChevronDown className="size-3.5" /> : chevron === "right" ? <ChevronRight className="size-3.5" /> : null}
+        {chevron === "down" ? <IconChevronDown className="size-3.5" /> : chevron === "right" ? <IconChevronRight className="size-3.5" /> : null}
       </span>
       <span className={cn("shrink-0", selected ? "text-primary" : "text-muted-foreground")}>{icon}</span>
       <span className="truncate">{label}</span>

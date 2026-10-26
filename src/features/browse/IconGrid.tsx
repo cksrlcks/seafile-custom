@@ -11,7 +11,7 @@ export function IconGrid(p: ListProps) {
       {p.creatingFolder && (
         <div className="flex flex-col items-center gap-1 rounded-md p-2">
           <FolderGlyph className="size-16" />
-          <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 text-center text-ui-sm md:text-ui-sm" />
+          <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 text-center text-xs md:text-xs" />
         </div>
       )}
       {p.entries.map((e) => {
@@ -33,9 +33,9 @@ export function IconGrid(p: ListProps) {
           >
             <div className="flex h-16 items-center justify-center">{e.type === "dir" ? <FolderGlyph className="size-16" /> : <EntryIcon entry={e} className="size-12" />}</div>
             {p.renamingPath === e.path ? (
-              <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 text-center text-ui-sm md:text-ui-sm" />
+              <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 text-center text-xs md:text-xs" />
             ) : (
-              <span className="line-clamp-2 w-full text-center text-ui-sm leading-tight break-all" title={e.name}>
+              <span className="line-clamp-2 w-full text-center text-xs leading-tight break-all" title={e.name}>
                 {e.name}
               </span>
             )}

@@ -203,25 +203,38 @@ export function MainScreen() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-ui text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-sm text-foreground">
       <TitleBar
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        canBack={canBack}
-        canForward={canForward}
-        onBack={() => go(-1)}
-        onForward={() => go(1)}
+        menu={{
+          newFolder: () => setCreatingFolder(true),
+          upload: () => dropRef.current?.open(),
+          selection: { count: selectedEntries.length, singleFile: selectedEntries.length === 1 && selectedEntries[0].type === "file" },
+          download: () => selectedEntries[0] && ops.download.mutate(selectedEntries[0]),
+          share: () => selectedEntries[0] && setSharing(selectedEntries[0]),
+          rename: () => selectedEntries[0] && setRenamingPath(selectedEntries[0].path),
+          remove: () => setDeleting(selectedEntries),
+          selectAll: () => setSelected(new Set(entries.map((x) => x.path))),
+          clearSelection: () => setSelected(new Set()),
+          view,
+          setView,
+          sidebarOpen,
+          toggleSidebar: () => setSidebarOpen((v) => !v),
+          refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
+          sort,
+          setSort,
+          back: () => go(-1),
+          forward: () => go(1),
+          up: () => setLoc({ ...loc, path: parentPath(loc.path) }),
+          canBack,
+          canForward,
+          canUp: loc.libId !== null && loc.path !== "/",
+          logout,
+        }}
         crumbs={crumbs}
         onNavigate={(path) => setLoc({ ...loc, path })}
         filter={filter}
         onFilter={setFilter}
-        view={view}
-        onView={setView}
-        onRefresh={() => void qc.invalidateQueries({ queryKey: ["dir"] })}
-        onNewFolder={() => setCreatingFolder(true)}
-        onUpload={() => dropRef.current?.open()}
         accountLabel={session.connection.baseUrl.replace(/^https?:\/\//, "")}
-        onLogout={logout}
         disabled={!loc.libId}
       />
 
@@ -280,12 +293,12 @@ export function MainScreen() {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="flex h-full items-center justify-center text-ui text-muted-foreground">{text}</div>;
+  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{text}</div>;
 }
 
 function ErrorBanner({ message, onRetry, actionLabel = "다시 시도" }: { message: string; onRetry(): void; actionLabel?: string }) {
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-ui text-destructive">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm text-destructive">
       <span className="truncate">{message}</span>
       <Button variant="outline" size="xs" onClick={onRetry}>
         {actionLabel}

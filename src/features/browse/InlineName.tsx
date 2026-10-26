@@ -42,7 +42,7 @@ export function InlineName({ initial, existing = [], onSubmit, onCancel, classNa
         onDoubleClick={(e) => e.stopPropagation()}
         className={cn("bg-card", className)}
       />
-      {error && <div className="absolute top-full left-0 z-20 mt-1 rounded-md bg-destructive px-2 py-1 text-caption text-primary-foreground shadow-item">{error}</div>}
+      {error && <div className="absolute top-full left-0 z-20 mt-1 rounded-md bg-destructive px-2 py-1 text-xs text-primary-foreground shadow-item">{error}</div>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Check, Copy, Link } from "lucide-react";
+import { IconCheck, IconCopy, IconLink } from "@tabler/icons-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -52,7 +52,7 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
           <div className="flex gap-2">
             <Input readOnly value={create.data.url} onFocus={(e) => e.target.select()} />
             <Button variant="outline" onClick={copy} className="shrink-0">
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? <IconCheck className="size-4" /> : <IconCopy className="size-4" />}
               {copied ? "복사됨" : "복사"}
             </Button>
           </div>
@@ -74,7 +74,7 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
       {!create.data && (
         <DialogFooter>
           <Button onClick={() => create.mutate()} disabled={create.isPending}>
-            <Link className="size-4" /> {create.isPending ? "만드는 중..." : "링크 만들기"}
+            <IconLink className="size-4" /> {create.isPending ? "만드는 중..." : "링크 만들기"}
           </Button>
         </DialogFooter>
       )}

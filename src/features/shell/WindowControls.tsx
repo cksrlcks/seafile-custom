@@ -1,4 +1,4 @@
-import { Copy, Minus, Square, X } from "lucide-react";
+import { IconCopy, IconMinus, IconSquare, IconX } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { cn } from "cn";
 
@@ -21,13 +21,13 @@ export function WindowControls() {
   return (
     <div className="flex shrink-0 self-start">
       <button type="button" aria-label="최소화" onClick={call("minimize")} className={cn(btn, "hover:bg-accent")}>
-        <Minus className="size-3.5" strokeWidth={1.5} />
+        <IconMinus className="size-3.5" stroke={1.5} />
       </button>
       <button type="button" aria-label={maximized ? "이전 크기로" : "최대화"} onClick={call("toggleMaximize")} className={cn(btn, "hover:bg-accent")}>
-        {maximized ? <Copy className="size-3 -scale-x-100" strokeWidth={1.5} /> : <Square className="size-3" strokeWidth={1.5} />}
+        {maximized ? <IconCopy className="size-3 -scale-x-100" stroke={1.5} /> : <IconSquare className="size-3" stroke={1.5} />}
       </button>
       <button type="button" aria-label="닫기" onClick={call("close")} className={cn(btn, "hover:bg-destructive hover:text-primary-foreground")}>
-        <X className="size-4" strokeWidth={1.5} />
+        <IconX className="size-4" stroke={1.5} />
       </button>
     </div>
   );

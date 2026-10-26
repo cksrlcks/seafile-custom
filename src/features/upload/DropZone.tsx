@@ -1,4 +1,4 @@
-import { Upload } from "lucide-react";
+import { IconUpload } from "@tabler/icons-react";
 import { type ReactNode, useImperativeHandle, type Ref } from "react";
 import { useDropzone } from "react-dropzone";
 import type { UploadTask } from "@/storage/StorageProvider";
@@ -30,8 +30,8 @@ export function DropZone({ targetDir, children, onFiles, handle }: Props) {
       <input {...getInputProps()} />
       {children}
       {isDragActive && (
-        <div className="pointer-events-none absolute inset-1 z-10 flex flex-col items-center justify-center gap-2 rounded-md border-2 border-primary/70 bg-primary/5 text-ui">
-          <Upload className="size-6 text-primary" />
+        <div className="pointer-events-none absolute inset-1 z-10 flex flex-col items-center justify-center gap-2 rounded-md border-2 border-primary/70 bg-primary/5 text-sm">
+          <IconUpload className="size-6 text-primary" />
           <span>
             여기에 놓으면 <span className="font-medium">{targetDir}</span> 에 업로드
           </span>
