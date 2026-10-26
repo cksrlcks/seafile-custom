@@ -17,8 +17,10 @@ export function LoginScreen() {
   const [showServer, setShowServer] = useState(false);
   const [username, setUsername] = useState(prefs.username ?? "");
   const [password, setPassword] = useState("");
-  const [rememberId, setRememberId] = useState(prefs.username !== null);
   const [autoLogin, setAutoLogin] = useState(prefs.autoLogin);
+  const [rememberIdOnly, setRememberIdOnly] = useState(prefs.username !== null);
+  // 자동 로그인이면 아이디 저장은 당연히 포함
+  const rememberId = autoLogin || rememberIdOnly;
   const [otp, setOtp] = useState("");
   const [otpRequired, setOtpRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +76,8 @@ export function LoginScreen() {
         )}
 
         <div className="flex items-center gap-5 text-xs">
-          <label className="flex cursor-default items-center gap-2">
-            <Checkbox checked={rememberId} onCheckedChange={(v) => setRememberId(!!v)} />
+          <label className={autoLogin ? "flex cursor-default items-center gap-2 text-muted-foreground" : "flex cursor-default items-center gap-2"}>
+            <Checkbox checked={rememberId} disabled={autoLogin} onCheckedChange={(v) => setRememberIdOnly(!!v)} />
             아이디 저장
           </label>
           <label className="flex cursor-default items-center gap-2">
