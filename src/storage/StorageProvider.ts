@@ -47,6 +47,8 @@ export interface Connection {
 }
 
 export interface StorageProvider {
+  /** 현재 인증 토큰. 세션 저장용. 로그인 전/로그아웃 후 null */
+  readonly token: string | null;
   login(username: string, password: string, otp?: string): Promise<void>;
   logout(): Promise<void>;
   isLoggedIn(): boolean;
