@@ -72,3 +72,15 @@ describe("button", () => {
   });
   it("default size is 26px", () => expect(b).toMatch(/default:\s*"h-6\.5/));
 });
+
+describe("button scope", () => {
+  const b = read("./button.tsx");
+  const base = b.slice(b.indexOf("cva(") + 4, b.indexOf("{", b.indexOf("cva(")));
+  it("ghost/link/secondary keep their shape (base radius and weight unchanged)", () => {
+    expect(base).toContain("rounded-lg");
+    expect(base).toContain("font-medium");
+  });
+  it.each(["default", "outline", "destructive"])("%s variant sets the desktop radius and weight", (v) => {
+    expect(b).toMatch(new RegExp(`${v}:\\s*"[^"]*rounded-md font-normal`));
+  });
+});
