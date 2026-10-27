@@ -31,7 +31,7 @@ export function EntryContextMenu({ entry, actions, children, asRow, className, o
     <Root>
       <ContextMenuTrigger render={trigger}>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-44">
-        <ContextMenuItem onClick={() => actions.onOpen(entry)} className="text-sm">
+        <ContextMenuItem inset onClick={() => actions.onOpen(entry)} className="text-sm">
           열기
           <ContextMenuShortcut>Enter</ContextMenuShortcut>
         </ContextMenuItem>

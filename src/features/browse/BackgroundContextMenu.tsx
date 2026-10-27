@@ -56,7 +56,7 @@ export function BackgroundContextMenu({ actions: a, trigger, children, disabled,
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="text-sm">보기</ContextMenuSubTrigger>
+          <ContextMenuSubTrigger inset className="text-sm">보기</ContextMenuSubTrigger>
           <ContextMenuSubContent>
             <ContextMenuRadioGroup value={a.view} onValueChange={(v) => a.setView(v as ViewMode)}>
               <ContextMenuRadioItem value="list" className="text-sm">
@@ -69,7 +69,7 @@ export function BackgroundContextMenu({ actions: a, trigger, children, disabled,
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="text-sm">정렬 기준</ContextMenuSubTrigger>
+          <ContextMenuSubTrigger inset className="text-sm">정렬 기준</ContextMenuSubTrigger>
           <ContextMenuSubContent>
             <ContextMenuRadioGroup value={a.sort.key} onValueChange={(k) => a.setSort({ ...a.sort, key: k as SortKey })}>
               <ContextMenuRadioItem value="name" className="text-sm">
@@ -94,7 +94,7 @@ export function BackgroundContextMenu({ actions: a, trigger, children, disabled,
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={a.selectAll} className="text-sm">
+        <ContextMenuItem inset onClick={a.selectAll} className="text-sm">
           모두 선택
           <ContextMenuShortcut>{mod}+A</ContextMenuShortcut>
         </ContextMenuItem>
