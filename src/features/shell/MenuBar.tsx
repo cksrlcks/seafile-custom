@@ -43,7 +43,7 @@ const MOD = modKey();
 export function MenuBar(a: MenuActions) {
   const [dialog, setDialog] = useState<"shortcuts" | "about" | null>(null);
   const has = a.selection.count > 0;
-  const quit = () => (isTauri() ? void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().close()) : window.close());
+  const quit = () => (isTauri() ? void import("@tauri-apps/api/core").then(({ invoke }) => invoke("quit")) : window.close());
   const item = "text-sm";
   return (
     <>
@@ -84,7 +84,7 @@ export function MenuBar(a: MenuActions) {
               로그아웃
             </MenubarItem>
             <MenubarItem onClick={quit} className={item}>
-              종료<MenubarShortcut>Alt+F4</MenubarShortcut>
+              종료
             </MenubarItem>
           </MenubarContent>
         </MenubarMenu>

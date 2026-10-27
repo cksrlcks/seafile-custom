@@ -10,6 +10,7 @@ import { TrashDialog } from "@/features/trash/TrashDialog";
 import { checkForUpdate } from "@/features/shell/updater";
 import { UpdateNotice } from "@/features/shell/UpdateNotice";
 import { StatusBar } from "@/features/shell/StatusBar";
+import { isTauri } from "@/features/shell/platform";
 import { TitleBar, type Crumb } from "@/features/shell/TitleBar";
 import { DropZone, type DropZoneHandle } from "@/features/upload/DropZone";
 import { OverwriteDialog, type OverwriteChoice } from "@/features/upload/OverwriteDialog";
@@ -226,6 +227,19 @@ export function MainScreen() {
     },
     onCreateFolderCancel: () => setCreatingFolder(false),
   };
+
+  // 트레이 메뉴(Rust)에서 넘어오는 동작
+  useEffect(() => {
+    if (!isTauri()) return;
+    const actions: Record<string, () => void> = {
+      upload: () => dropRef.current?.open(),
+      refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
+      settings: () => setSettingsOpen(true),
+      logout,
+    };
+    const off = import("@tauri-apps/api/event").then(({ listen }) => listen<string>("tray", (e) => actions[e.payload]?.()));
+    return () => void off.then((f) => f());
+  }, [qc, logout]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-sm text-foreground">

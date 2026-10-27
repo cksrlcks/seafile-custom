@@ -1,3 +1,10 @@
+use tauri::{
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter, Manager, WindowEvent,
+};
+use tauri_plugin_opener::OpenerExt;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -95,6 +102,20 @@ mod shell_icon {
     }
 }
 
+/// 창 닫기는 트레이로 숨기기만 하므로, 실제 종료는 이 커맨드로
+#[tauri::command]
+fn quit(app: AppHandle) {
+    app.exit(0);
+}
+
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -103,7 +124,60 @@ pub fn run() {
         .plugin(tauri_plugin_upload::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![greet, file_icon])
+        .setup(|app| {
+            let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+            let sep = || PredefinedMenuItem::separator(app);
+            let version = MenuItem::new(app, format!("Drive v{}", app.package_info().version), false, None::<&str>)?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &item("open", "Drive 열기")?,
+                    &sep()?,
+                    &item("upload", "파일 업로드…")?,
+                    &item("refresh", "새로고침")?,
+                    &item("downloads", "다운로드 폴더 열기")?,
+                    &sep()?,
+                    &item("settings", "설정…")?,
+                    &item("logout", "로그아웃")?,
+                    &sep()?,
+                    &version,
+                    &item("quit", "종료")?,
+                ],
+            )?;
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Drive")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, e| match e.id.as_ref() {
+                    "open" => show_main(app),
+                    "quit" => app.exit(0),
+                    "downloads" => {
+                        if let Ok(dir) = app.path().download_dir() {
+                            let _ = app.opener().open_path(dir.to_string_lossy(), None::<&str>);
+                        }
+                    }
+                    // 나머지는 화면 쪽 동작: 창을 띄우고 프론트로 넘긴다
+                    id => {
+                        show_main(app);
+                        let _ = app.emit("tray", id);
+                    }
+                })
+                .on_tray_icon_event(|tray, e| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                        show_main(tray.app_handle());
+                    }
+                })
+                .build(app)?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

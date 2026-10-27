@@ -9,6 +9,7 @@ import { connectionFor, loadPrefs, savePrefs } from "@/storage/session";
 import { isMac, isTauri, showWindowControls } from "@/features/shell/platform";
 import { WindowControls } from "@/features/shell/WindowControls";
 import { loginErrorMessage } from "./loginError";
+import pkg from "../../../package.json";
 
 export function LoginScreen() {
   const { session, login } = useSession();
@@ -49,7 +50,7 @@ export function LoginScreen() {
         <div {...drag} className="flex-1" />
         {showWindowControls() && <WindowControls />}
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center pb-9">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 pb-9">
       <form onSubmit={submit} className="flex w-88 flex-col gap-4 rounded-xl border border-border bg-card p-8 text-sm shadow-float">
         <div className="flex flex-col items-center gap-2 pb-2">
           <CloudMark className="size-14" />
@@ -96,6 +97,7 @@ export function LoginScreen() {
           {showServer && <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="h-8 md:text-xs" required />}
         </div>
       </form>
+      <p className="text-xs text-muted-foreground">v{pkg.version}</p>
       </div>
     </div>
   );
