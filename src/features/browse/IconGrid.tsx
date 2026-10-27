@@ -3,6 +3,7 @@ import { FolderGlyph } from "@/components/ui/folder-glyph";
 import { EntryContextMenu } from "./ContextMenu";
 import { EntryIcon, NEW_FOLDER_ENTRY, SharedBadge, type ListProps } from "./FileList";
 import { InlineName } from "./InlineName";
+import { uniqueName } from "./validateName";
 
 /** 아이콘 보기: 96px 셀, 64px 아이콘, 12px 두 줄 라벨 */
 export function IconGrid(p: ListProps) {
@@ -11,7 +12,7 @@ export function IconGrid(p: ListProps) {
       {p.creatingFolder && (
         <div className="flex flex-col items-center gap-1 rounded-md p-2">
           <EntryIcon entry={NEW_FOLDER_ENTRY} size={48} className="size-12" fallback={<FolderGlyph className="size-16" />} />
-          <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 text-center text-xs md:text-xs" />
+          <InlineName initial={uniqueName("새 폴더", p.existingNames)} existing={p.existingNames} create onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 text-center text-xs md:text-xs" />
         </div>
       )}
       {p.entries.map((e) => {

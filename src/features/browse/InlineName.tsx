@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cn } from "cn";
 import { Input } from "@/components/ui/input";
-import { validateName } from "./validateName";
+import { resolveName, validateName } from "./validateName";
 
 interface Props {
   initial: string;
@@ -9,18 +9,20 @@ interface Props {
   existing?: string[];
   onSubmit(name: string): void;
   onCancel(): void;
+  /** 새로 만들기: 기본 이름(initial)을 바꾸지 않고 확정해도 그 이름으로 만든다 */
+  create?: boolean;
   className?: string;
 }
 
 /** 이름 변경·새 폴더용 인라인 입력. Enter 확정, Esc 취소, 포커스 잃으면 확정 시도. 잘못된 이름은 빨간 테두리 + 문구. */
-export function InlineName({ initial, existing = [], onSubmit, onCancel, className }: Props) {
+export function InlineName({ initial, existing = [], onSubmit, onCancel, create = false, className }: Props) {
   const [value, setValue] = useState(initial);
   const error = value.trim() === initial ? null : validateName(value, existing);
   const submit = () => {
-    const v = value.trim();
-    if (!v || v === initial) return onCancel();
-    if (validateName(v, existing)) return; // 잘못된 이름이면 입력 상태 유지
-    onSubmit(v);
+    const r = resolveName(value, initial, existing, create);
+    if (r.action === "cancel") onCancel();
+    else if (r.action === "submit") onSubmit(r.name);
+    // stay: 잘못된 이름이면 입력 상태 유지
   };
   return (
     <div className="relative w-full">

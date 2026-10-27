@@ -5,6 +5,7 @@ import { formatDateLong, formatSize } from "@/lib/format";
 import type { Entry } from "@/storage/StorageProvider";
 import { EntryContextMenu, type EntryMenuActions } from "./ContextMenu";
 import { InlineName } from "./InlineName";
+import { uniqueName } from "./validateName";
 import { useColumnWidths, type ColKey } from "./useColumnWidths";
 import { useShellIcon } from "./useShellIcon";
 
@@ -107,7 +108,7 @@ export function FileList(p: ListProps) {
             <td className="pl-3" colSpan={4}>
               <span className="flex items-center gap-2">
                 <EntryIcon entry={NEW_FOLDER_ENTRY} />
-                <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-sm md:text-sm" />
+                <InlineName initial={uniqueName("새 폴더", p.existingNames)} existing={p.existingNames} create onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-sm md:text-sm" />
               </span>
             </td>
           </tr>
