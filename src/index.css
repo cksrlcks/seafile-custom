@@ -4,6 +4,8 @@
 @import "pretendard/dist/web/variable/pretendardvariable.css";
 
 @custom-variant dark (&:is(.dark *));
+/* 맥 전용 보정(mac:…). data-os는 main.tsx에서 붙인다 */
+@custom-variant mac (&:is(html[data-os="mac"] *));
 
 @theme inline {
     /* 데스크톱 밀도(HIG/Fluent): sm=13px 본문, xs=12px 보조, 2xs=11px 라벨.
