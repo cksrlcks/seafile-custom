@@ -26,6 +26,7 @@ import { joinPath, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
+import { BackgroundContextMenu } from "./BackgroundContextMenu";
 import { FileList, FileListSkeleton, orderEntries, type Sort, type SortKey, type ViewMode } from "./FileList";
 import { IconGrid } from "./IconGrid";
 import { Sidebar } from "./Sidebar";
@@ -328,14 +329,30 @@ export function MainScreen() {
           ) : (
             <>
           <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
-            <div
-              ref={listRef}
-              tabIndex={0}
-              onKeyDown={onKeyDown}
-              onPointerDown={marquee.onPointerDown}
-              onClickCapture={marquee.onClickCapture}
-              onClick={(e) => e.target === e.currentTarget && setSelected(new Set())}
-              className="relative min-h-0 flex-1 overflow-auto outline-none"
+            <BackgroundContextMenu
+              disabled={loc.libId === null || creatingFolder || renamingPath !== null}
+              onOpen={() => setSelected(new Set())}
+              actions={{
+                newFolder: () => setCreatingFolder(true),
+                upload: () => dropRef.current?.open(),
+                selectAll: () => setSelected(new Set(entries.map((x) => x.path))),
+                refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
+                view,
+                setView,
+                sort,
+                setSort,
+              }}
+              trigger={
+                <div
+                  ref={listRef}
+                  tabIndex={0}
+                  onKeyDown={onKeyDown}
+                  onPointerDown={marquee.onPointerDown}
+                  onClickCapture={marquee.onClickCapture}
+                  onClick={(e) => e.target === e.currentTarget && setSelected(new Set())}
+                  className="relative min-h-0 flex-1 overflow-auto outline-none"
+                />
+              }
             >
               {loc.libId === null ? (
                 <Empty text="왼쪽에서 저장소를 선택하세요" />
@@ -349,7 +366,7 @@ export function MainScreen() {
                 <FileList {...listProps} />
               )}
               {marquee.rect && <div className="pointer-events-none absolute border border-primary/60 bg-primary/10" style={marquee.rect} />}
-            </div>
+            </BackgroundContextMenu>
           </DropZone>
           <FileSelectionBar
             count={selectedEntries.length}
