@@ -32,6 +32,24 @@ const buttonVariants = cva(
         "icon-lg": "size-9",
       },
     },
+    // 데스크톱 크기(26/24/28px)는 default·outline·destructive만. 테두리 없는 버튼은 예전 크기 유지(선택 막대·툴바 등)
+    compoundVariants: [
+      {
+        variant: ["ghost", "secondary", "link"],
+        size: "default",
+        class: "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+      },
+      {
+        variant: ["ghost", "secondary", "link"],
+        size: "sm",
+        class: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+      },
+      {
+        variant: ["ghost", "secondary", "link"],
+        size: "lg",
+        class: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

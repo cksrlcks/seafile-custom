@@ -84,3 +84,15 @@ describe("button scope", () => {
     expect(b).toMatch(new RegExp(`${v}:\\s*"[^"]*rounded-md font-normal`));
   });
 });
+
+describe("button sizes keep ghost/secondary/link as before", () => {
+  const b = read("./button.tsx");
+  const compound = b.slice(b.indexOf("compoundVariants"));
+  it("has compound variants for the untouched variants", () => {
+    expect(compound).toMatch(/variant: \["ghost", "secondary", "link"\]/);
+  });
+  it("sm stays 28px and default stays 32px for them", () => {
+    expect(compound).toMatch(/size: "sm",\s*class: "h-7/);
+    expect(compound).toMatch(/size: "default",\s*class: "h-8/);
+  });
+});
