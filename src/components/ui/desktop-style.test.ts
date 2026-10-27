@@ -61,3 +61,14 @@ describe("dialog", () => {
     expect(d).not.toContain("flex-col-reverse");
   });
 });
+
+describe("button", () => {
+  const b = read("./button.tsx");
+  it("no web press nudge", () => expect(b).not.toContain("translate-y-px"));
+  it("default/outline/destructive have edge borders", () => {
+    expect(b).toMatch(/default: "[^"]*border-primary-edge[^"]*border-b-primary-edge-bottom/);
+    expect(b).toMatch(/outline:\s*"[^"]*border-outline-edge[^"]*border-b-outline-edge-bottom/);
+    expect(b).toMatch(/destructive:\s*"[^"]*bg-destructive [^"]*text-white/);
+  });
+  it("default size is 26px", () => expect(b).toMatch(/default:\s*"h-6\.5/));
+});
