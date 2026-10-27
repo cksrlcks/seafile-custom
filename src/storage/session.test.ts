@@ -18,7 +18,7 @@ function memStorage(): Storage {
 describe("session", () => {
   it("loadSession returns default when empty", () => {
     expect(loadSession({ local: memStorage(), session: memStorage() })).toEqual({
-      connection: { kind: "seafile", baseUrl: "https://seafile.heavybear-lab.net" },
+      connection: { kind: "seafile", baseUrl: "http://192.168.1.240" },
       token: null,
     });
   });

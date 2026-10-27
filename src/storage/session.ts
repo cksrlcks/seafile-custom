@@ -17,7 +17,7 @@ interface Stores {
 
 const KEY = "seadrive.session";
 const PREFS_KEY = "seadrive.loginPrefs";
-const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "https://seafile.heavybear-lab.net" }, token: null };
+const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "http://192.168.1.240" }, token: null };
 const defaultStores = (): Stores => ({ local: localStorage, session: sessionStorage });
 
 /** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. */

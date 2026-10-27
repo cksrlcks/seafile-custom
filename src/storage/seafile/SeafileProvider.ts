@@ -5,7 +5,7 @@ import { CHUNK_SIZE, chunkRanges } from "./chunk";
 import { clearInterrupted, isInterrupted, markInterrupted } from "./resumeRegistry";
 import { xhrUpload } from "./xhrUpload";
 
-interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean; head_commit_id?: string }
+interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean; head_commit_id?: string; type?: "repo" | "srepo" | "grepo"; group_name?: string }
 interface DirentDto { id: string; name: string; type: "file" | "dir"; size?: number; mtime: number }
 interface TreeDirentDto { type: "file" | "dir"; id: string; name: string; parent_dir: string; size?: number; mtime: string | number }
 interface ShareLinkDto { token: string; link: string; repo_id: string; repo_name: string; path: string; obj_name: string; is_dir: boolean; expire_date: string | null; is_expired: boolean; is_encrypted?: boolean; password?: string | null; view_cnt: number; ctime: string }
@@ -53,8 +53,17 @@ export class SeafileProvider implements StorageProvider {
   }
 
   async listLibraries(): Promise<Library[]> {
-    const repos = await this.api.get<RepoDto[]>("/api2/repos/");
-    return repos.map((r) => ({ id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted, headCommitId: r.head_commit_id }));
+    // 같은 저장소가 소유(repo)·공유(srepo)·그룹(grepo)으로 여러 번 온다. 한 섹션에만 두되 소유 > 그룹 > 공유 순으로 고른다
+    const rank = (r: RepoDto) => (r.type === "srepo" ? 2 : r.type === "grepo" ? 1 : 0);
+    const byId = new Map<string, RepoDto>();
+    for (const r of await this.api.get<RepoDto[]>("/api2/repos/")) {
+      const prev = byId.get(r.id);
+      if (!prev || rank(r) < rank(prev)) byId.set(r.id, r);
+    }
+    return [...byId.values()].map((r) => ({
+      id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted, headCommitId: r.head_commit_id,
+      section: r.type === "grepo" ? r.group_name || "그룹" : r.type === "srepo" ? "나에게 공유됨" : "내 저장소",
+    }));
   }
 
   async renameLibrary(libId: string, newName: string): Promise<void> {

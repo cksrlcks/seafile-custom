@@ -32,6 +32,19 @@ describe("SeafileProvider", () => {
     expect(entries.map((e) => e.path)).toEqual(["/x/a", "/x/b.txt"]);
     expect(entries[0].type).toBe("dir");
   });
+
+  it("listLibraries keeps an owned repo under 내 저장소 even when it is also in a group", async () => {
+    fetchMock.mockResolvedValue(
+      json([
+        { id: "a", name: "집-공유", type: "repo", size: 0, mtime: 1, encrypted: false },
+        { id: "b", name: "내 라이브러리", type: "repo", size: 0, mtime: 1, encrypted: false },
+        { id: "a", name: "집-공유", type: "grepo", group_name: "집", size: 0, mtime: 1, encrypted: false },
+        { id: "c", name: "받은 것", type: "srepo", size: 0, mtime: 1, encrypted: false },
+      ]),
+    );
+    const libs = await new SeafileProvider("https://host.example", "t").listLibraries();
+    expect(libs.map((l) => [l.id, l.section])).toEqual([["a", "내 저장소"], ["b", "내 저장소"], ["c", "나에게 공유됨"]]);
+  });
 });
 
 describe("SeafileProvider file operations", () => {

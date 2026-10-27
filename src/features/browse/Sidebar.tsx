@@ -34,37 +34,44 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onRenameF
   const [renaming, setRenaming] = useState<string | null>(null);
   const names = libraries?.map((l) => l.name) ?? [];
   const ctx: Ctx = { loc, onNavigate, renaming, setRenaming, onRenameFolder };
+  // 섹션은 서버가 준 순서대로, 단 "내 저장소"는 항상 맨 위
+  const sections = new Map<string, Library[]>([["내 저장소", []]]);
+  for (const l of libraries ?? []) sections.set(l.section, [...(sections.get(l.section) ?? []), l]);
   return (
     <aside style={{ width }} className="flex shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pt-2 pb-2">
-      <div className="mb-1 px-2 pt-1 text-2xs font-medium text-muted-foreground">내 저장소</div>
-      {libraries?.map((lib) => {
-        if (lib.encrypted) return <Row key={lib.id} root depth={0} icon={<IconLock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />;
-        const active = loc.libId === lib.id;
-        return (
-          <div key={lib.id}>
-            {renaming === `lib:${lib.id}` ? (
-              <div className="my-px pl-7">
-                <InlineName
-                  initial={lib.name}
-                  existing={names.filter((n) => n !== lib.name)}
-                  onSubmit={(n) => {
-                    setRenaming(null);
-                    onRenameLibrary(lib, n);
-                  }}
-                  onCancel={() => setRenaming(null)}
-                  className="h-7 text-sm md:text-sm"
-                />
+      {[...sections].filter(([, libs]) => libs.length > 0).map(([section, libs], i) => (
+        <div key={section} className={cn(i > 0 && "mt-3")}>
+          <div className="mb-1 px-2 pt-1 text-2xs font-medium text-muted-foreground">{section}</div>
+          {libs.map((lib) => {
+            if (lib.encrypted) return <Row key={lib.id} root depth={0} icon={<IconLock className="size-4" />} label={lib.name} disabled title="암호화된 저장소는 지원하지 않습니다" />;
+            const active = loc.libId === lib.id;
+            return (
+              <div key={lib.id}>
+                {renaming === `lib:${lib.id}` ? (
+                  <div className="my-px pl-7">
+                    <InlineName
+                      initial={lib.name}
+                      existing={names.filter((n) => n !== lib.name)}
+                      onSubmit={(n) => {
+                        setRenaming(null);
+                        onRenameLibrary(lib, n);
+                      }}
+                      onCancel={() => setRenaming(null)}
+                      className="h-7 text-sm md:text-sm"
+                    />
+                  </div>
+                ) : (
+                  <WithRenameMenu onRename={() => setRenaming(`lib:${lib.id}`)}>
+                    {/* 저장소 = 드라이브 루트. 접고 펼치지 않고, 선택된 저장소 아래에만 폴더 트리 */}
+                    <Row root depth={0} icon={<IconCloud className="size-4" />} label={lib.name} selected={page === "files" && active && loc.path === "/"} onClick={() => onNavigate({ libId: lib.id, path: "/" })} />
+                  </WithRenameMenu>
+                )}
+                {active && <DirChildren libId={lib.id} path="/" depth={0} ctx={ctx} />}
               </div>
-            ) : (
-              <WithRenameMenu onRename={() => setRenaming(`lib:${lib.id}`)}>
-                {/* 저장소 = 드라이브 루트. 접고 펼치지 않고, 선택된 저장소 아래에만 폴더 트리 */}
-                <Row root depth={0} icon={<IconCloud className="size-4" />} label={lib.name} selected={page === "files" && active && loc.path === "/"} onClick={() => onNavigate({ libId: lib.id, path: "/" })} />
-              </WithRenameMenu>
-            )}
-            {active && <DirChildren libId={lib.id} path="/" depth={0} ctx={ctx} />}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
       <div className="mt-auto border-t border-sidebar-border pt-2">
         <Row root depth={0} icon={<IconLink className="size-4" />} label="공유 링크" selected={page === "links"} onClick={onShareLinks} />
         <Row root depth={0} icon={<IconTrash className="size-4" />} label="휴지통" disabled={loc.libId === null} title={loc.libId === null ? "저장소를 먼저 선택하세요" : undefined} onClick={onTrash} />

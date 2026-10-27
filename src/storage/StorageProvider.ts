@@ -4,6 +4,8 @@ export interface Library {
   size: number;
   mtime: number;
   encrypted: boolean;
+  /** 사이드바 섹션 이름: "내 저장소", "나에게 공유됨", 또는 그룹 이름 */
+  section: string;
   /** 내용이 바뀔 때마다 달라지는 서버 식별자. 검색 인덱스 갱신 판단용 */
   headCommitId?: string;
 }

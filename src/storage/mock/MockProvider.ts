@@ -6,9 +6,10 @@ import { baseName, joinPath, parentPath } from "../path";
 export class MockProvider implements StorageProvider {
   token: string | null;
   private libs: Library[] = [
-    { id: "docs", name: "문서", size: 1_200_000, mtime: 1_760_000_000, encrypted: false },
-    { id: "photos", name: "사진", size: 9_800_000_000, mtime: 1_760_100_000, encrypted: false },
-    { id: "vault", name: "금고", size: 0, mtime: 1_760_000_000, encrypted: true },
+    { id: "docs", name: "문서", size: 1_200_000, mtime: 1_760_000_000, encrypted: false, section: "내 저장소" },
+    { id: "photos", name: "사진", size: 9_800_000_000, mtime: 1_760_100_000, encrypted: false, section: "내 저장소" },
+    { id: "vault", name: "금고", size: 0, mtime: 1_760_000_000, encrypted: true, section: "내 저장소" },
+    { id: "family", name: "집-공유", size: 0, mtime: 1_760_000_000, encrypted: false, section: "집" },
   ];
   private tree = new Map<string, Entry[]>();
   private trash = new Map<string, TrashEntry[]>();
@@ -30,6 +31,7 @@ export class MockProvider implements StorageProvider {
     this.set("photos", "/", [dir("/2025", now), dir("/2026", now), file("/IMG_0001.jpg", 3_355_443, now)]);
     this.set("photos", "/2025", []);
     this.set("photos", "/2026", [file("/2026/IMG_0100.jpg", 4_000_000, now)]);
+    this.set("family", "/", []);
   }
 
   private key(libId: string, path: string) {
