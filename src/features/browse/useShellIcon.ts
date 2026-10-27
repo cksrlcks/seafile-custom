@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { isMac, isTauri } from "@/features/shell/platform";
+import { isTauri } from "@/features/shell/platform";
 import type { Entry } from "@/storage/StorageProvider";
 
-const supported = isTauri() && !isMac();
+const supported = isTauri();
 
 /**
- * 윈도우 셸 아이콘(탐색기와 같은 파일/폴더 그림)을 blob URL로. 확장자·크기별로 한 번만 받아 세션 동안 캐시.
- * 브라우저·맥이거나 아직 안 받았으면 null → 기존 SVG 아이콘을 쓴다.
+ * OS 셸 아이콘(윈도우 탐색기·맥 Finder와 같은 파일/폴더 그림)을 blob URL로. 확장자·크기별로 한 번만 받아 세션 동안 캐시.
+ * 브라우저이거나 아직 안 받았으면 null → 기존 SVG 아이콘을 쓴다.
  */
 export function useShellIcon(entry: Entry, size: 16 | 48): string | null {
   const dir = entry.type === "dir";

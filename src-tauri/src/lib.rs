@@ -11,14 +11,85 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-/// 윈도우 셸이 쓰는 파일/폴더 아이콘을 PNG(RGBA)로. 탐색기와 같은 그림. ext는 확장자(없으면 ""), dir이면 폴더.
+/// OS 셸이 쓰는 파일/폴더 아이콘을 PNG(RGBA)로. 윈도우 탐색기·맥 Finder와 같은 그림. ext는 확장자(없으면 ""), dir이면 폴더.
 /// size: 16·32·48 중 하나로 올림. async라 메인 스레드를 막지 않는다.
 #[tauri::command]
 async fn file_icon(ext: String, dir: bool, size: u32) -> Result<tauri::ipc::Response, String> {
     shell_icon::png(&ext, dir, size).map(tauri::ipc::Response::new)
 }
 
-#[cfg(not(windows))]
+/// 맥: Finder가 쓰는 파일/폴더 아이콘을 size×size PNG로 그린다
+#[cfg(target_os = "macos")]
+mod shell_icon {
+    use objc2::rc::autoreleasepool;
+    use objc2::{AnyThread, Message};
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSWorkspace};
+    use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
+    use objc2_uniform_type_identifiers::{UTType, UTTypeData, UTTypeFolder};
+
+    pub fn png(ext: &str, dir: bool, size: u32) -> Result<Vec<u8>, String> {
+        autoreleasepool(|_| unsafe {
+            // 확장자로 UTType을 찾고, 모르는 확장자·확장자 없음은 일반 문서 아이콘
+            let ty = if dir {
+                UTTypeFolder.retain()
+            } else {
+                UTType::typeWithFilenameExtension(&NSString::from_str(ext)).unwrap_or_else(|| UTTypeData.retain())
+            };
+            let icon = NSWorkspace::sharedWorkspace().iconForContentType(&ty);
+
+            let px = size as isize;
+            let rep = NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                NSBitmapImageRep::alloc(),
+                std::ptr::null_mut(),
+                px,
+                px,
+                8,
+                4,
+                true,
+                false,
+                NSDeviceRGBColorSpace,
+                0,
+                0,
+            )
+            .ok_or("NSBitmapImageRep")?;
+            let ctx = NSGraphicsContext::graphicsContextWithBitmapImageRep(&rep).ok_or("NSGraphicsContext")?;
+            // 다른 스레드의 그리기와 섞이지 않게 이 스레드의 현재 컨텍스트만 잠깐 바꾼다
+            NSGraphicsContext::saveGraphicsState_class();
+            NSGraphicsContext::setCurrentContext(Some(&ctx));
+            // NSImage가 크기에 맞는 해상도 버전을 골라 그린다
+            icon.drawInRect(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(size as f64, size as f64)));
+            NSGraphicsContext::restoreGraphicsState_class();
+
+            let data = rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()).ok_or("PNG")?;
+            Ok(data.to_vec())
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        /// 폴더·알려진 확장자·모르는 확장자·확장자 없음 모두 요청한 크기의 PNG가 나와야 한다.
+        /// SHELL_ICON_DUMP=<폴더>를 주면 결과 PNG를 저장해 눈으로 확인할 수 있다
+        #[test]
+        fn renders_png_at_requested_size() {
+            let dump = std::env::var("SHELL_ICON_DUMP").ok();
+            for (ext, dir) in [("", true), ("pdf", false), ("jpg", false), ("zip", false), ("zzzz", false), ("", false)] {
+                for size in [16, 32, 48] {
+                    let png = super::png(ext, dir, size).unwrap();
+                    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+                    let w = u32::from_be_bytes(png[16..20].try_into().unwrap());
+                    let h = u32::from_be_bytes(png[20..24].try_into().unwrap());
+                    assert_eq!((w, h), (size, size), "{ext:?} dir={dir}");
+                    if let Some(d) = &dump {
+                        let name = if dir { "folder".into() } else if ext.is_empty() { "noext".into() } else { ext.to_string() };
+                        std::fs::write(format!("{d}/{name}-{size}.png"), &png).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod shell_icon {
     pub fn png(_ext: &str, _dir: bool, _size: u32) -> Result<Vec<u8>, String> {
         Err("unsupported".into())

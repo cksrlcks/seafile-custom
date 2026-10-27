@@ -51,4 +51,4 @@ npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
 - 창을 닫으면 숨겨지고, Dock 아이콘이나 메뉴 막대 아이콘을 누르면 다시 열린다. 완전히 끄려면 `⌘Q` 또는 메뉴 막대 아이콘 → 종료.
 - 메뉴 막대 아이콘은 흑백 템플릿으로 그려져 다크/라이트 모드를 따라간다.
-- 파일 아이콘은 Windows 탐색기 아이콘을 쓰는 기능이라 macOS에서는 기본 아이콘으로 나온다.
+- 파일·폴더 아이콘은 Windows와 마찬가지로 OS(Finder) 아이콘을 그대로 쓴다.
