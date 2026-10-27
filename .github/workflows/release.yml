@@ -65,6 +65,16 @@ jobs:
             [ -n "${!k}" ] && echo "$k=${!k}" >> "$GITHUB_ENV"
           done
 
+      # CHANGELOG.md의 "## v<버전>" 섹션이 릴리스 본문이자 latest.json의 notes(앱 업데이트 알림)가 된다
+      - name: 릴리스 노트 읽기
+        id: notes
+        shell: bash
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          body=$(awk -v h="## $v" '$0==h{f=1;next} /^## /{f=0} f' CHANGELOG.md | sed '/./,$!d')
+          if [ -z "$body" ]; then echo "::error::CHANGELOG.md에 '## $v' 섹션이 없다"; exit 1; fi
+          { echo "body<<__NOTES__"; echo "$body"; echo "__NOTES__"; } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,7 +83,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Drive v__VERSION__
-          releaseBody: 자동 빌드된 릴리스입니다.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

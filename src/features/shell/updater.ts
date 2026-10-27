@@ -23,6 +23,13 @@ const subscribe = (l: () => void) => {
 };
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** 릴리스 노트(CHANGELOG 섹션)의 첫 줄 요약. 알림은 한 줄이라 마크다운 기호는 뺀다 */
+export const noteSummary = (body?: string) =>
+  body
+    ?.split("\n")
+    .map((l) => l.replace(/[#*`]/g, "").trim())
+    .find(Boolean);
+
 /** 릴리스의 latest.json을 확인한다. 자동 확인(manual=false)은 실패·최신이어도 조용히 넘어간다 */
 export async function checkForUpdate(manual = false) {
   if (!isTauri()) {
@@ -35,7 +42,7 @@ export async function checkForUpdate(manual = false) {
     const { check } = await import("@tauri-apps/plugin-updater");
     const u = await check();
     pending = u;
-    if (u) set({ kind: "available", version: u.version, notes: u.body });
+    if (u) set({ kind: "available", version: u.version, notes: noteSummary(u.body) });
     else set(manual ? { kind: "none" } : { kind: "idle" });
   } catch (e) {
     set(manual ? { kind: "error", message: `업데이트를 확인하지 못했습니다 (${message(e)})` } : { kind: "idle" });
