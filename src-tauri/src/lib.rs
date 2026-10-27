@@ -146,6 +146,8 @@ pub fn run() {
             )?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
+                // macOS 메뉴 막대는 흑백 템플릿 아이콘이 관례. 알파(구름 모양)만 써서 다크/라이트에 맞춰 그려진다
+                .icon_as_template(cfg!(target_os = "macos"))
                 .tooltip("Drive")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -178,6 +180,13 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![greet, file_icon, quit])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // macOS: 창을 숨긴 뒤 Dock 아이콘을 누르면 다시 띄운다
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = _event {
+                show_main(_app);
+            }
+        });
 }

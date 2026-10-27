@@ -1,6 +1,8 @@
-# v* 태그를 푸시하면 Windows 설치 파일을 빌드·서명해 GitHub Release로 올린다.
-# 릴리스에 latest.json이 함께 올라가고, 설치된 앱이 그걸 보고 자동 업데이트한다.
+# v* 태그를 푸시하면 Windows·macOS 설치 파일을 빌드·서명해 GitHub Release로 올린다.
+# 각 플랫폼이 같은 초안(draft) 릴리스에 올리고 latest.json을 합친 뒤, 모두 끝나면 publish 잡이 공개한다.
+# 설치된 앱은 latest.json을 보고 자동 업데이트한다.
 # 필요한 시크릿: TAURI_SIGNING_PRIVATE_KEY (~/.tauri/seadrive.key 내용), TAURI_SIGNING_PRIVATE_KEY_PASSWORD (비워 둔 키면 빈 값)
+# 선택 시크릿(macOS 정식 서명·공증, 없으면 ad-hoc 서명): docs/macos-release.md 참고
 name: Release
 
 on:
@@ -12,8 +14,16 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,6 +33,9 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          # universal 빌드는 두 아키텍처가 모두 필요하다
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
@@ -31,6 +44,26 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run lint
+
+      # Apple 인증서 시크릿이 있을 때만 넘긴다. 빈 값으로 넘기면 Tauri가 빈 인증서를 가져오려다 실패한다
+      - name: Apple 서명 설정
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "Apple 인증서 없음: ad-hoc 서명으로 빌드한다"
+            exit 0
+          fi
+          for k in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!k}" ] && echo "$k=${!k}" >> "$GITHUB_ENV"
+          done
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -41,5 +74,19 @@ jobs:
           tagName: v__VERSION__
           releaseName: Drive v__VERSION__
           releaseBody: 자동 빌드된 릴리스입니다.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
+
+  # 두 플랫폼이 모두 올라간 뒤에 공개해야 latest/download/latest.json에 양쪽이 다 들어 있다
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 릴리스 공개
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
