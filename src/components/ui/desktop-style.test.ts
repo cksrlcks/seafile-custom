@@ -48,3 +48,16 @@ describe("no web-style motion", () => {
     expect(read(f)).not.toMatch(/zoom-(in|out)-|slide-in-from-/);
   });
 });
+
+describe("dialog", () => {
+  const d = read("./dialog.tsx");
+  it("close button is opt-in", () => expect(d).toMatch(/function DialogContent\(\{[^}]*showCloseButton = false/));
+  it("box uses dialog shadow, no ring", () => {
+    expect(d).toContain("shadow-dialog");
+    expect(d).not.toMatch(/data-slot="dialog-content"[\s\S]*?ring-1/);
+  });
+  it("footer is a tight gray band, always a row", () => {
+    expect(d).toMatch(/dialog-footer[\s\S]*bg-dialog-footer/);
+    expect(d).not.toContain("flex-col-reverse");
+  });
+});

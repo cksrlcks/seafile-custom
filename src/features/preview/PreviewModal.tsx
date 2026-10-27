@@ -36,7 +36,7 @@ export function PreviewModal({ libId, entries, index, onClose, onNavigate, onDow
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent showCloseButton={false} className="flex h-[88vh] w-[92vw] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
+      <DialogContent showCloseButton={false} className="flex h-[88vh] max-h-[88vh] w-[92vw] max-w-6xl flex-col gap-0 overflow-hidden overflow-y-hidden p-0 sm:max-w-6xl">
         {entry && (
           <>
             <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconCheck, IconCopy, IconLink } from "@tabler/icons-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useStorage } from "@/storage/StorageContext";
 import { passwordProblem, SHARE_LINK_PASSWORD_MIN_LENGTH } from "./passwordPolicy";
@@ -115,13 +115,14 @@ function Body({ libId, entry }: { libId: string; entry: Entry }) {
           {create.error && <p className="text-xs text-destructive">{shareErrorMessage(create.error)}</p>}
         </div>
       )}
-      {!create.data && (
-        <DialogFooter>
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" />}>닫기</DialogClose>
+        {!create.data && (
           <Button onClick={() => create.mutate()} disabled={create.isPending || !!problem}>
             <IconLink className="size-4" /> {create.isPending ? "만드는 중..." : "링크 만들기"}
           </Button>
-        </DialogFooter>
-      )}
+        )}
+      </DialogFooter>
     </>
   );
 }

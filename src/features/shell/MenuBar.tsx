@@ -191,7 +191,7 @@ export function MenuBar(a: MenuActions) {
       </Menubar>
 
       <Dialog open={dialog === "shortcuts"} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="text-sm">
+        <DialogContent showCloseButton className="text-sm">
           <DialogHeader>
             <DialogTitle>키보드 단축키</DialogTitle>
             <DialogDescription>파일 목록에서 사용할 수 있는 키입니다.</DialogDescription>
@@ -223,7 +223,7 @@ export function MenuBar(a: MenuActions) {
       </Dialog>
 
       <Dialog open={dialog === "about"} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="text-sm sm:max-w-sm">
+        <DialogContent showCloseButton className="text-sm sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Drive</DialogTitle>
             <DialogDescription>버전 {pkg.version}</DialogDescription>
