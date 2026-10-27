@@ -17,3 +17,10 @@
 
 ## 아이콘
 `lucide-react`, 크기 `size-4`(16px). 폴더 `Folder`, 파일 `File`, 이미지 `Image`, 텍스트 `FileText`, 암호화 `Lock`.
+
+## 떠오르는 요소 (메뉴·대화상자·버튼)
+설계: `docs/superpowers/specs/2026-10-27-desktop-ui-redesign-design.md`. 두 OS에서 같은 데스크톱 프로그램 모양.
+- **메뉴**(우클릭·드롭다운·메뉴 막대)는 `src/components/ui/menu-styles.ts`의 클래스만 쓴다. 반투명 유리 바탕(`bg-menu` + `shadow-menu`), 24px 항목, 강조는 `primary` 바탕 흰 글자. 아이콘 있는 메뉴의 아이콘 없는 항목은 `inset`.
+- **대화상자**는 흰 본문 + 아래 회색 띠(`DialogFooter`). 아이콘 장식 없음. ✕는 띠가 없는 창에만(`showCloseButton`).
+- **버튼**: `default`(파랑)·`outline`(흰색)·`destructive`(빨강)는 아래 테두리가 조금 진한 26px 버튼. 그라데이션·반사광 금지.
+- **움직임**: 확대(`zoom-*`)·미끄러짐(`slide-in-from-*`) 애니메이션 금지, 짧은 페이드만. `src/components/ui/desktop-style.test.ts`가 지킨다.

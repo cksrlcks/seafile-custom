@@ -34,7 +34,7 @@ type PanelProps = {
 /** 우하단 전송 패널 껍데기. 업로드·다운로드가 같은 모양을 쓴다. */
 export function TransferPanel({ icon, title, done, total, percent, detail, allDone, expanded, onToggle, close, children }: PanelProps) {
   return (
-    <div className="w-96 overflow-hidden rounded-xl border border-border bg-popover text-sm shadow-float animate-in fade-in-0 slide-in-from-bottom-3 duration-200">
+    <div className="w-96 overflow-hidden rounded-xl bg-popover text-sm shadow-dialog animate-in fade-in-0 duration-100">
       <div className="flex items-center gap-3 px-3 py-2.5">
         <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", allDone ? "bg-success/10 text-success" : "bg-primary/10 text-primary")}>
           {allDone ? <IconCircleCheckFilled className="size-5 animate-in zoom-in-50 duration-300" /> : icon}
@@ -56,7 +56,7 @@ export function TransferPanel({ icon, title, done, total, percent, detail, allDo
         </Button>
       </div>
       {percent !== undefined && <Progress value={percent} className="px-3 pb-2.5" />}
-      {expanded && <ul className="max-h-56 overflow-auto border-t border-border py-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{children}</ul>}
+      {expanded && <ul className="max-h-56 overflow-auto border-t border-border py-1 animate-in fade-in-0 duration-100">{children}</ul>}
     </div>
   );
 }

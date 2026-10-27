@@ -15,7 +15,7 @@ export function UpdateNotice() {
 
   if (s.kind === "idle" || s.kind === "checking") return null;
   return (
-    <div className="w-96 rounded-xl border border-border bg-popover p-3 text-sm shadow-float animate-in fade-in-0 slide-in-from-bottom-3 duration-200">
+    <div className="w-96 rounded-xl bg-popover p-3 text-sm shadow-dialog animate-in fade-in-0 duration-100">
       {s.kind === "available" && (
         <div className="flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
