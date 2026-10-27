@@ -43,7 +43,10 @@ export function SharedBadge({ className }: { className?: string }) {
   );
 }
 
-/** 윈도우 Tauri면 셸 아이콘(img), 아니면 SVG. fallback은 셸 아이콘이 없을 때 폴더 대신 그릴 것(그리드의 FolderGlyph) */
+/** 새 폴더 입력 줄의 아이콘용. 셸 아이콘은 종류·이름만 보므로 나머지는 빈 값 */
+export const NEW_FOLDER_ENTRY: Entry = { id: "", name: "", type: "dir", size: 0, mtime: 0, path: "" };
+
+/** Tauri(윈도우·맥)면 셸 아이콘(img), 아니면 SVG. fallback은 셸 아이콘이 없을 때 폴더 대신 그릴 것(그리드의 FolderGlyph) */
 export function EntryIcon({ entry, className, size = 16, fallback }: { entry: Entry; className?: string; size?: 16 | 48; fallback?: ReactNode }) {
   const shell = useShellIcon(entry, size);
   if (shell) return <img src={shell} alt="" draggable={false} className={cn("size-4 shrink-0", className)} />;
@@ -103,7 +106,7 @@ export function FileList(p: ListProps) {
           <tr className="h-8.5">
             <td className="pl-3" colSpan={4}>
               <span className="flex items-center gap-2">
-                <IconFolder className="size-4 fill-primary/20 text-primary" />
+                <EntryIcon entry={NEW_FOLDER_ENTRY} />
                 <InlineName initial="새 폴더" existing={p.existingNames} onSubmit={p.onCreateFolder} onCancel={p.onCreateFolderCancel} className="h-6 max-w-xs text-sm md:text-sm" />
               </span>
             </td>
