@@ -316,6 +316,14 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
+        // 화면이 새로 로드되면(새로고침·오류 복구) Claude 요청 중 답을 못 받게 된 것을 끝내고 다시 준비를 기다린다
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Started {
+                if let Some(hub) = webview.try_state::<std::sync::Arc<mcp::Hub>>() {
+                    hub.reset();
+                }
+            }
+        })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.state::<Mutex<Prefs>>().lock().unwrap().close_to_tray {

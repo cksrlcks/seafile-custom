@@ -29,13 +29,15 @@ pub struct Hub {
     conns: Mutex<std::collections::HashMap<u64, TcpStream>>,
     /// Some = 아직 준비 전(쌓인 줄), None = 준비됨
     pending: Mutex<Option<Vec<(u64, String)>>>,
+    /// WebView에 넘겼지만 아직 답이 없는 요청 (연결, JSON id). 새로고침 때 오류로 끝내려고 기억한다
+    inflight: Mutex<HashSet<(u64, String)>>,
 }
 
 impl Hub {
     pub fn start(token: String, on_line: impl Fn(u64, String) + Send + Sync + 'static) -> io::Result<(Arc<Hub>, u16)> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr()?.port();
-        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())) });
+        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())), inflight: Default::default() });
         let h = hub.clone();
         std::thread::spawn(move || {
             for (id, stream) in (1u64..).zip(listener.incoming()) {
@@ -66,6 +68,9 @@ impl Hub {
     }
 
     fn dispatch(&self, id: u64, line: String) {
+        if let Some(rid) = rpc_id(&line, true) {
+            self.inflight.lock().unwrap().insert((id, rid));
+        }
         let mut p = self.pending.lock().unwrap();
         match p.as_mut() {
             Some(buf) => buf.push((id, line)),
@@ -85,10 +90,30 @@ impl Hub {
     }
 
     pub fn respond(&self, conn: u64, line: &str) -> io::Result<()> {
+        if let Some(rid) = rpc_id(line, false) {
+            self.inflight.lock().unwrap().remove(&(conn, rid));
+        }
         let mut conns = self.conns.lock().unwrap();
         let s = conns.get_mut(&conn).ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "연결이 끊겼습니다"))?;
         s.write_all(format!("{line}\n").as_bytes())
     }
+
+    /// WebView가 새로 로드되기 시작했다: 답을 기다리던 요청은 오류로 끝내고, 새 페이지가 mcp_ready할 때까지 다시 쌓는다
+    pub fn reset(&self) {
+        let mut p = self.pending.lock().unwrap();
+        if p.is_none() {
+            *p = Some(Vec::new());
+        }
+        drop(p);
+        let lost: Vec<(u64, String)> = self.inflight.lock().unwrap().drain().collect();
+        for (conn, rid) in lost {
+            let _ = self.respond(conn, &rpc_error(&rid, "Drive 앱 화면이 다시 시작됐습니다. 다시 시도해 주세요."));
+        }
+    }
+}
+
+fn rpc_error(id: &str, message: &str) -> String {
+    format!(r#"{{"jsonrpc":"2.0","id":{id},"error":{{"code":-32000,"message":"{message}"}}}}"#)
 }
 
 /// JSON-RPC 줄에서 id(JSON 표기). 요청이면 method가 있고, 응답이면 없다
@@ -120,7 +145,7 @@ impl<W: Write> Shared<W> {
     fn fail_pending(&self) {
         let ids: Vec<String> = self.pending.lock().unwrap().drain().collect();
         for id in ids {
-            self.emit(&format!(r#"{{"jsonrpc":"2.0","id":{id},"error":{{"code":-32000,"message":"Drive 앱과 연결이 끊겼습니다. 다시 시도해 주세요."}}}}"#));
+            self.emit(&rpc_error(&id, "Drive 앱과 연결이 끊겼습니다. 다시 시도해 주세요."));
         }
         self.cv.notify_all();
     }
@@ -207,10 +232,22 @@ fn connect_app() -> io::Result<TcpStream> {
         }
         if !launched {
             launched = true;
-            std::process::Command::new(std::env::current_exe()?).arg("--autostart").spawn()?;
+            autostart_command()?.spawn()?;
         }
         std::thread::sleep(Duration::from_millis(300));
     }
+}
+
+/// 앱을 트레이로 띄우는 명령. 중계의 stdio(Claude의 파이프)와 작업 폴더(Claude의 프로젝트)를 물려주지 않는다
+fn autostart_command() -> io::Result<std::process::Command> {
+    use std::process::Stdio;
+    let exe = std::env::current_exe()?;
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.arg("--autostart").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    if let Some(dir) = exe.parent() {
+        cmd.current_dir(dir);
+    }
+    Ok(cmd)
 }
 
 /// `Drive --mcp` 진입점. 종료 코드를 돌려준다
@@ -368,6 +405,41 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         let got: Vec<String> = seen.lock().unwrap().iter().map(|(_, l)| l.clone()).collect();
         assert_eq!(got, ["{\"id\":1}"]);
+    }
+
+    #[test]
+    fn autostart_detaches_from_relay() {
+        // 앱이 Claude의 작업 폴더를 붙잡지 않도록 실행 파일 폴더에서 시작한다(stdio는 null로 끊는다)
+        let cmd = autostart_command().unwrap();
+        let exe = std::env::current_exe().unwrap();
+        assert_eq!(cmd.get_program(), exe.as_os_str());
+        assert_eq!(cmd.get_args().collect::<Vec<_>>(), ["--autostart"]);
+        assert_eq!(cmd.get_current_dir(), exe.parent());
+    }
+
+    #[test]
+    fn hub_reset_fails_inflight_and_rebuffers() {
+        // WebView 새로고침: 답을 기다리던 요청은 오류로 끝내고, 새 페이지가 준비될 때까지 다시 쌓는다
+        let (hub, port, seen) = recording_hub();
+        hub.set_ready();
+        let mut s = client(port, "tok");
+        writeln!(s, r#"{{"jsonrpc":"2.0","id":5,"method":"tools/call"}}"#).unwrap();
+        writeln!(s, r#"{{"jsonrpc":"2.0","id":6,"method":"ping"}}"#).unwrap();
+        assert!(wait_until(|| seen.lock().unwrap().len() == 2));
+        let conn = seen.lock().unwrap()[0].0;
+        hub.respond(conn, r#"{"jsonrpc":"2.0","id":6,"result":{}}"#).unwrap();
+        hub.reset();
+        let mut r = BufReader::new(s.try_clone().unwrap());
+        let (mut first, mut second) = (String::new(), String::new());
+        r.read_line(&mut first).unwrap();
+        r.read_line(&mut second).unwrap();
+        assert!(first.contains("\"id\":6") && first.contains("result"), "{first}");
+        assert!(second.contains("\"id\":5") && second.contains("-32000"), "{second}");
+        writeln!(s, "after").unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(seen.lock().unwrap().len(), 2);
+        hub.set_ready();
+        assert!(wait_until(|| seen.lock().unwrap().len() == 3));
     }
 
     /// on_line에서 delay 뒤 id 1에 응답하는 Hub

@@ -55,6 +55,20 @@ describe("waitSettled", () => {
     await expect(waitSettled(src, ["1"], settled)).resolves.toEqual([{ id: "1", status: "done" }]);
   });
 
+  it("resolves when an item is removed from the list before settling", async () => {
+    // 패널의 "모두 취소" = cancelAll 직후 clearFinished: 대기 항목이 끝난 상태를 거치지 않고 목록에서 사라진다
+    const src = source([
+      { id: "1", status: "running" },
+      { id: "2", status: "running" },
+    ]);
+    const p = waitSettled(src, ["1", "2"], settled);
+    src.emit([{ id: "2", status: "done" }]);
+    await expect(p).resolves.toEqual([
+      { id: "1", status: "running" },
+      { id: "2", status: "done" },
+    ]);
+  });
+
   it("unsubscribes after resolving", async () => {
     const src = source([{ id: "1", status: "running" }]);
     const p = waitSettled(src, ["1"], settled);
