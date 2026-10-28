@@ -2,6 +2,7 @@ import type { DownloadQueue } from "@/features/download/downloadQueue";
 import { searchEntries } from "@/features/search/searchIndex";
 import type { IndexedEntry } from "@/features/search/useSearchIndex";
 import type { UploadQueue } from "@/features/upload/uploadQueue";
+import { formatDate, formatSize } from "@/lib/format";
 import { baseName, joinPath, parentPath } from "@/storage/path";
 import { StorageError, type Entry, type Library, type StorageProvider, type UploadTask } from "@/storage/StorageProvider";
 import { waitSettled } from "./waitSettled";
@@ -47,8 +48,12 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   },
   {
     name: "list_dir",
-    description: "저장소 안 폴더의 파일·폴더 목록. 올릴 위치를 제안하기 전에 기존 구조를 볼 때 쓴다.",
-    inputSchema: { type: "object", properties: { library: LIBRARY, path: str("'/'로 시작하는 폴더 경로. 루트는 '/'") }, required: ["library", "path"] },
+    description: "저장소 안 폴더의 파일·폴더 목록(크기·수정한 날짜는 읽기 좋은 형식). 올릴 위치를 제안하기 전에 기존 구조를 볼 때 쓴다.",
+    inputSchema: {
+      type: "object",
+      properties: { library: str("저장소 id. 생략하면 '내 저장소'의 저장소(하나뿐일 때). 여럿이면 후보를 알려준다"), path: str("'/'로 시작하는 폴더 경로. 루트는 '/'") },
+      required: ["path"],
+    },
   },
   {
     name: "search",
@@ -163,6 +168,13 @@ function decodeBase64(b64: string): Uint8Array<ArrayBuffer> {
 }
 const isStrs = (v: unknown) => Array.isArray(v) && v.length > 0 && v.every(isStr);
 
+/** library를 생략했을 때: '내 저장소'의 저장소가 하나면 그것, 아니면 후보를 담아 실패한다 */
+async function myLibraryId(ctx: ToolCtx): Promise<string> {
+  const mine = (await ctx.storage.listLibraries()).filter((l) => l.section === "내 저장소" && !l.encrypted);
+  if (mine.length === 1) return mine[0].id;
+  throw new Error(`library를 지정하세요. 내 저장소: ${JSON.stringify(mine.map((l) => ({ id: l.id, name: l.name })))}`);
+}
+
 async function findLibrary(ctx: ToolCtx, id: string, use: "upload" | "download"): Promise<Library> {
   const lib = (await ctx.storage.listLibraries()).find((l) => l.id === id);
   if (!lib) throw new Error(`저장소를 찾을 수 없습니다: ${id}`);
@@ -228,13 +240,15 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
     case "list_libraries":
       return json((await ctx.storage.listLibraries()).map((l) => ({ id: l.id, name: l.name, section: l.section, readOnly: !!l.readOnly, encrypted: l.encrypted })));
     case "list_dir": {
-      const entries = await ctx.storage.listDir(arg(args, "library", isStr), normalizeDir(arg(args, "path", isStr)));
-      return json(entries.map((e) => ({ name: e.name, type: e.type, size: e.size, mtime: e.mtime })));
+      const libId = isStr(args.library) ? (args.library as string) : await myLibraryId(ctx);
+      const entries = await ctx.storage.listDir(libId, normalizeDir(arg(args, "path", isStr)));
+      // Claude가 숫자를 날짜·크기로 바꾸느라 코드를 돌리지 않게 읽기 좋은 형식으로 준다
+      return json(entries.map((e) => ({ name: e.name, type: e.type, size: e.type === "file" ? formatSize(e.size) : undefined, modified: formatDate(e.mtime) })));
     }
     case "search": {
       const { entries, loading } = ctx.searchIndex();
       const libNames = new Map((await ctx.storage.listLibraries()).map((l) => [l.id, l.name]));
-      const results = searchEntries(entries, arg(args, "query", isStr), 20).map((e) => ({ library: e.libId, libraryName: libNames.get(e.libId) ?? e.libId, path: e.path, type: e.type, size: e.size }));
+      const results = searchEntries(entries, arg(args, "query", isStr), 20).map((e) => ({ library: e.libId, libraryName: libNames.get(e.libId) ?? e.libId, path: e.path, type: e.type, size: formatSize(e.size) }));
       return json(loading ? { results, note: "색인 중이라 결과가 일부일 수 있습니다" } : { results });
     }
     case "upload_file": {
@@ -264,7 +278,9 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
     case "download":
       return download(ctx, arg(args, "library", isStr), arg(args, "paths", isStrs), isStr(args.local_dir) ? (args.local_dir as string) : undefined);
     case "recent_downloads":
-      return json(await ctx.recentFiles(await ctx.defaultDownloadDir(), typeof args.limit === "number" ? args.limit : 10));
+      return json(
+        (await ctx.recentFiles(await ctx.defaultDownloadDir(), typeof args.limit === "number" ? args.limit : 10)).map((f) => ({ name: f.name, path: f.path, size: formatSize(f.size), modified: formatDate(f.mtime) })),
+      );
     default:
       throw new Error(`알 수 없는 도구: ${name}`);
   }

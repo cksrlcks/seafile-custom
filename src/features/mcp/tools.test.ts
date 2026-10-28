@@ -49,9 +49,25 @@ describe("callTool", () => {
     expect(libs).toContainEqual({ id: "family", name: "집-공유", section: "나에게 공유됨", readOnly: true, encrypted: false });
   });
 
-  it("list_dir lists entries", async () => {
+  it("list_dir lists entries with readable size and date", async () => {
     const r = parse(await callTool("list_dir", { library: "docs", path: "회의록" }, makeCtx()));
     expect(r.map((e: { name: string }) => e.name)).toEqual(["2026-10-20.md", "2026-10-13.md"]);
+    expect(r[0].size).toMatch(/ (B|KB|MB)$/);
+    expect(r[0].modified).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+    const root = parse(await callTool("list_dir", { library: "docs", path: "/" }, makeCtx()));
+    expect(root.find((e: { name: string }) => e.name === "회의록").size).toBeUndefined();
+  });
+
+  it("list_dir without library uses the only '내 저장소' library, else lists candidates", async () => {
+    const ctx = makeCtx();
+    const many = await callTool("list_dir", { path: "/" }, ctx);
+    expect(many.isError).toBe(true);
+    expect(many.content[0].text).toContain('"id":"docs"');
+    expect(many.content[0].text).not.toContain("vault"); // 암호화 저장소는 후보에서 뺀다
+    const all = await ctx.storage.listLibraries();
+    vi.spyOn(ctx.storage, "listLibraries").mockResolvedValue(all.filter((l) => l.id !== "photos"));
+    const one = parse(await callTool("list_dir", { path: "회의록" }, ctx));
+    expect(one.map((e: { name: string }) => e.name)).toEqual(["2026-10-20.md", "2026-10-13.md"]);
   });
 
   it(
@@ -134,7 +150,7 @@ describe("callTool", () => {
   it("search maps library names and flags loading", async () => {
     const entries = [{ id: "1", name: "2026-10-20.md", type: "file" as const, size: 4000, mtime: 0, path: "/회의록/2026-10-20.md", libId: "docs" }];
     const r = parse(await callTool("search", { query: "2026-10" }, makeCtx({ searchIndex: () => ({ entries, loading: true }) })));
-    expect(r.results).toEqual([{ library: "docs", libraryName: "문서", path: "/회의록/2026-10-20.md", type: "file", size: 4000 }]);
+    expect(r.results).toEqual([{ library: "docs", libraryName: "문서", path: "/회의록/2026-10-20.md", type: "file", size: "3.9 KB" }]);
     expect(r.note).toBe("색인 중이라 결과가 일부일 수 있습니다");
   });
 
@@ -142,6 +158,6 @@ describe("callTool", () => {
     const recentFiles = vi.fn(async () => [{ name: "a.docx", path: "C:/Downloads/a.docx", size: 1, mtime: 2 }]);
     const r = parse(await callTool("recent_downloads", {}, makeCtx({ recentFiles })));
     expect(recentFiles).toHaveBeenCalledWith("C:/Downloads", 10);
-    expect(r).toEqual([{ name: "a.docx", path: "C:/Downloads/a.docx", size: 1, mtime: 2 }]);
+    expect(r).toEqual([{ name: "a.docx", path: "C:/Downloads/a.docx", size: "1 B", modified: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d$/) }]);
   });
 });
