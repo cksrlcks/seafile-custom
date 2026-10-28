@@ -5,7 +5,7 @@ import { CHUNK_SIZE, chunkRanges } from "./chunk";
 import { clearInterrupted, isInterrupted, markInterrupted } from "./resumeRegistry";
 import { xhrUpload } from "./xhrUpload";
 
-interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean; head_commit_id?: string; type?: "repo" | "srepo" | "grepo"; group_name?: string }
+interface RepoDto { id: string; name: string; size: number; mtime: number; encrypted: boolean; head_commit_id?: string; type?: "repo" | "srepo" | "grepo"; group_name?: string; permission?: string }
 interface DirentDto { id: string; name: string; type: "file" | "dir"; size?: number; mtime: number }
 interface TreeDirentDto { type: "file" | "dir"; id: string; name: string; parent_dir: string; size?: number; mtime: string | number }
 interface ShareLinkDto { token: string; link: string; repo_id: string; repo_name: string; path: string; obj_name: string; is_dir: boolean; expire_date: string | null; is_expired: boolean; is_encrypted?: boolean; password?: string | null; view_cnt: number; ctime: string }
@@ -72,6 +72,8 @@ export class SeafileProvider implements StorageProvider {
       id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted, headCommitId: r.head_commit_id,
       section: r.type === "grepo" || r.type === "srepo" ? "나에게 공유됨" : "내 저장소",
       starred: starred.has(r.id),
+      // cloud-edit은 웹에서 문서 편집만 되고 업로드·이름 변경은 안 된다
+      readOnly: ["r", "preview", "cloud-edit"].includes(r.permission ?? ""),
     }));
   }
 

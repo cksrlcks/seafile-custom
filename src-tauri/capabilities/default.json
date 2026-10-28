@@ -18,6 +18,9 @@
     "upload:allow-download",
     "opener:allow-reveal-item-in-dir",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }

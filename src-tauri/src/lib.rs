@@ -195,7 +195,14 @@ pub fn run() {
         .plugin(tauri_plugin_upload::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
         .setup(|app| {
+            // 로그인할 때 자동 실행이면 창 없이 트레이에만 둔다
+            if std::env::args().any(|a| a == "--autostart") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            }
             let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
             let sep = || PredefinedMenuItem::separator(app);
             let version = MenuItem::new(app, format!("Drive v{}", app.package_info().version), false, None::<&str>)?;

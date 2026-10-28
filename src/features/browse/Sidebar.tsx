@@ -17,7 +17,7 @@ interface Props {
   /** 현재 저장소의 휴지통 열기 */
   onTrash(): void;
   /** 메인 영역에 무엇이 떠 있는지. 파일 탐색이 아니면 저장소 행을 선택 표시하지 않는다 */
-  page: "files" | "links";
+  page: "files" | "links" | "trash";
   onShareLinks(): void;
 }
 
@@ -28,6 +28,8 @@ interface Ctx {
   renaming: string | null;
   setRenaming(key: string | null): void;
   onRenameFolder(libId: string, path: string, newName: string): void;
+  /** 읽기 전용 저장소의 폴더는 우클릭 메뉴(이름 변경)가 없다 */
+  readOnly?: boolean;
 }
 
 const COLLAPSED_KEY = "seadrive.sidebar.collapsed";
@@ -100,7 +102,7 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onStarLib
                       }} />
                   </RowMenu>
                 )}
-                {active && <DirChildren libId={lib.id} path="/" depth={0} ctx={ctx} />}
+                {active && <DirChildren libId={lib.id} path="/" depth={0} ctx={{ ...ctx, readOnly: lib.readOnly }} />}
               </div>
             );
           })}
@@ -108,7 +110,7 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onStarLib
       ))}
       <div className="mt-auto border-t border-sidebar-border pt-2">
         <Row root depth={0} icon={<IconLink className="size-4" />} label="공유 링크" selected={page === "links"} onClick={onShareLinks} />
-        <Row root depth={0} icon={<IconTrash className="size-4" />} label="휴지통" disabled={loc.libId === null} title={loc.libId === null ? "저장소를 먼저 선택하세요" : undefined} onClick={onTrash} />
+        <Row root depth={0} icon={<IconTrash className="size-4" />} label="휴지통" selected={page === "trash"} disabled={loc.libId === null} title={loc.libId === null ? "저장소를 먼저 선택하세요" : undefined} onClick={onTrash} />
       </div>
     </aside>
   );
@@ -172,9 +174,10 @@ function DirNode({ libId, path, name, depth, siblingNames, ctx }: { libId: strin
           />
         </div>
       ) : (
-        <RowMenu onRename={() => ctx.setRenaming(key)}>
-          <Row depth={depth} icon={<IconFolder className="size-4" />} label={name} selected={selected} chevron={expanded ? "down" : "right"} onChevron={() => setOpen(!expanded)} onClick={() => ctx.onNavigate({ libId, path })} />
-        </RowMenu>
+        (() => {
+          const row = <Row depth={depth} icon={<IconFolder className="size-4" />} label={name} selected={selected} chevron={expanded ? "down" : "right"} onChevron={() => setOpen(!expanded)} onClick={() => ctx.onNavigate({ libId, path })} />;
+          return ctx.readOnly ? row : <RowMenu onRename={() => ctx.setRenaming(key)}>{row}</RowMenu>;
+        })()
       )}
       {expanded && <DirChildren libId={libId} path={path} depth={depth + 1} ctx={ctx} />}
     </>

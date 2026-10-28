@@ -9,7 +9,7 @@ export class MockProvider implements StorageProvider {
     { id: "docs", name: "문서", size: 1_200_000, mtime: 1_760_000_000, encrypted: false, section: "내 저장소" },
     { id: "photos", name: "사진", size: 9_800_000_000, mtime: 1_760_100_000, encrypted: false, section: "내 저장소" },
     { id: "vault", name: "금고", size: 0, mtime: 1_760_000_000, encrypted: true, section: "내 저장소" },
-    { id: "family", name: "집-공유", size: 0, mtime: 1_760_000_000, encrypted: false, section: "나에게 공유됨" },
+    { id: "family", name: "집-공유", size: 0, mtime: 1_760_000_000, encrypted: false, section: "나에게 공유됨", readOnly: true },
   ];
   private tree = new Map<string, Entry[]>();
   private trash = new Map<string, TrashEntry[]>();

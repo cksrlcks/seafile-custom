@@ -6,7 +6,7 @@ import { previewKind } from "@/features/preview/previewKind";
 import { ShareDialog } from "@/features/share/ShareDialog";
 import { ShareLinksPage } from "@/features/share/ShareLinksPage";
 import { SettingsDialog } from "@/features/settings/SettingsDialog";
-import { TrashDialog } from "@/features/trash/TrashDialog";
+import { TrashPage } from "@/features/trash/TrashPage";
 import { checkForUpdate } from "@/features/shell/updater";
 import { UpdateNotice } from "@/features/shell/UpdateNotice";
 import { StatusBar } from "@/features/shell/StatusBar";
@@ -71,6 +71,7 @@ export function MainScreen() {
 
   const dir = useCurrentDir(loc);
   const lib = libs.data?.find((l) => l.id === loc.libId);
+  const readOnly = !!lib?.readOnly;
   const crumbs: Crumb[] = useMemo(() => {
     if (!lib) return [];
     const segs = splitPath(loc.path);
@@ -149,9 +150,12 @@ export function MainScreen() {
   const [deleting, setDeleting] = useState<Entry[]>([]);
   const [sharing, setSharing] = useState<Entry | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState(false);
-  /** 메인 영역: 파일 탐색 또는 공유 링크 페이지. 어디로든 이동하면 파일 탐색으로 돌아온다 */
-  const [page, setPage] = useState<"files" | "links">("files");
+  /** 메인 영역: 파일 탐색 · 공유 링크 · 휴지통 페이지. 어디로든 이동하면 파일 탐색으로 돌아온다 */
+  const [page, setPage] = useState<"files" | "links" | "trash">("files");
+  const openTrash = () => {
+    setPage("trash");
+    setSelected(new Set());
+  };
   useEffect(() => void checkForUpdate(), []); // 시작할 때 한 번 조용히 확인
   const openLinks = () => {
     setPage("links");
@@ -172,9 +176,9 @@ export function MainScreen() {
   const menuActions: EntryMenuActions = {
     onOpen: open,
     onDownload: (e) => ops.download.mutate(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
-    onRename: (e) => setRenamingPath(e.path),
+    onRename: readOnly ? undefined : (e) => setRenamingPath(e.path),
     onShare: (e) => setSharing(e),
-    onDelete: (e) => setDeleting(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
+    onDelete: readOnly ? undefined : (e) => setDeleting(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
   };
 
   // ---- 키보드 ----
@@ -197,14 +201,14 @@ export function MainScreen() {
     else if (e.key === "End") (e.preventDefault(), moveTo(entries.length - 1));
     else if (e.key === "Enter" && focusPath) (e.preventDefault(), open(entries[idx]));
     else if (e.key === "Backspace" && loc.path !== "/") (e.preventDefault(), setLoc({ ...loc, path: parentPath(loc.path) }));
-    else if (e.key === "F2" && focusPath) (e.preventDefault(), setRenamingPath(focusPath));
-    else if (e.key === "Delete" && selectedEntries.length) (e.preventDefault(), setDeleting(selectedEntries));
+    else if (e.key === "F2" && focusPath && !readOnly) (e.preventDefault(), setRenamingPath(focusPath));
+    else if (e.key === "Delete" && selectedEntries.length && !readOnly) (e.preventDefault(), setDeleting(selectedEntries));
     else if (e.key === "Escape") setSelected(new Set());
     else if (mod && e.key.toLowerCase() === "a") (e.preventDefault(), setSelected(new Set(entries.map((x) => x.path))));
     else if (e.altKey && e.key === "ArrowLeft") (e.preventDefault(), go(-1));
     else if (e.altKey && e.key === "ArrowRight") (e.preventDefault(), go(1));
     else if (e.key === "F5") (e.preventDefault(), void qc.invalidateQueries({ queryKey: ["dir"] }));
-    else if (mod && e.shiftKey && e.key.toLowerCase() === "n") (e.preventDefault(), setCreatingFolder(true));
+    else if (mod && e.shiftKey && e.key.toLowerCase() === "n" && !readOnly) (e.preventDefault(), setCreatingFolder(true));
     else if (mod && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
   }
 
@@ -253,6 +257,7 @@ export function MainScreen() {
           newFolder: () => setCreatingFolder(true),
           upload: () => dropRef.current?.open(),
           selection: { count: selectedEntries.length, hasFile: selectedEntries.some((e) => e.type === "file") },
+          readOnly,
           download: () => ops.download.mutate(selectedEntries),
           share: () => selectedEntries[0] && setSharing(selectedEntries[0]),
           rename: () => selectedEntries[0] && setRenamingPath(selectedEntries[0].path),
@@ -274,10 +279,10 @@ export function MainScreen() {
           canUp: loc.libId !== null && loc.path !== "/",
           logout,
           settings: () => setSettingsOpen(true),
-          trash: () => setTrashOpen(true),
+          trash: openTrash,
           shareLinks: openLinks,
         }}
-        crumbs={page === "links" ? [{ label: "공유 링크", path: loc.path }] : crumbs}
+        crumbs={page === "links" ? [{ label: "공유 링크", path: loc.path }] : page === "trash" ? [{ label: `${lib?.name ?? ""} 휴지통`, path: loc.path }] : crumbs}
         onNavigate={(path) => setLoc({ ...loc, path })}
         onSearchPick={(libId, e) => {
           // 폴더는 안으로, 파일은 그 폴더로 가서 해당 파일을 선택
@@ -296,7 +301,7 @@ export function MainScreen() {
           <>
             <Sidebar
               width={sidebar.width}
-              onTrash={() => setTrashOpen(true)}
+              onTrash={openTrash}
               page={page}
               onShareLinks={openLinks}
               libraries={libs.data}
@@ -331,9 +336,11 @@ export function MainScreen() {
 
           {page === "links" ? (
             <ShareLinksPage />
+          ) : page === "trash" && loc.libId ? (
+            <TrashPage libId={loc.libId} readOnly={readOnly} />
           ) : (
             <>
-          <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef}>
+          <DropZone targetDir={loc.path} onFiles={onFiles} handle={dropRef} disabled={readOnly}>
             <BackgroundContextMenu
               disabled={loc.libId === null || creatingFolder || renamingPath !== null}
               onOpen={() => setSelected(new Set())}
@@ -346,6 +353,7 @@ export function MainScreen() {
                 setView,
                 sort,
                 setSort,
+                readOnly,
               }}
               trigger={
                 <div
@@ -364,7 +372,7 @@ export function MainScreen() {
               ) : dir.isLoading ? (
                 <FileListSkeleton />
               ) : entries.length === 0 && !creatingFolder ? (
-                <Empty text="비어 있는 폴더입니다. 파일을 끌어다 놓으세요" />
+                <Empty text={readOnly ? "비어 있는 폴더입니다" : "비어 있는 폴더입니다. 파일을 끌어다 놓으세요"} />
               ) : view === "grid" ? (
                 <IconGrid {...listProps} />
               ) : (
@@ -381,6 +389,7 @@ export function MainScreen() {
             onRename={() => selectedEntries[0] && setRenamingPath(selectedEntries[0].path)}
             onDelete={() => setDeleting(selectedEntries)}
             onClear={() => setSelected(new Set())}
+            readOnly={readOnly}
           />
             </>
           )}
@@ -394,7 +403,7 @@ export function MainScreen() {
 
       <StatusBar
         itemCount={page === "files" && dir.data ? dir.data.length : null}
-        note={page === "links" ? (shareLinks.data ? `링크 ${shareLinks.data.length}개` : "") : undefined}
+        note={page === "links" ? (shareLinks.data ? `링크 ${shareLinks.data.length}개` : "") : readOnly && dir.data ? `${dir.data.length}개 항목 · 읽기 전용` : undefined}
         selectedCount={selectedEntries.length}
         selectedBytes={selectedEntries.reduce((a, e) => a + e.size, 0)}
       />
@@ -404,7 +413,6 @@ export function MainScreen() {
       )}
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <TrashDialog libId={loc.libId} open={trashOpen} onClose={() => setTrashOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog
         entries={deleting}

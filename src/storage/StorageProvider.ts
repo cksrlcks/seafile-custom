@@ -8,6 +8,8 @@ export interface Library {
   section: string;
   /** 즐겨찾기. 사이드바 맨 위 "즐겨찾기" 섹션에 둔다 */
   starred?: boolean;
+  /** 읽기 전용으로 공유받은 저장소. 업로드·새 폴더·이름 변경·삭제를 끈다 */
+  readOnly?: boolean;
   /** 내용이 바뀔 때마다 달라지는 서버 식별자. 검색 인덱스 갱신 판단용 */
   headCommitId?: string;
 }

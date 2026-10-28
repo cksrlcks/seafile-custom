@@ -13,6 +13,8 @@ export interface MenuActions {
   upload(): void;
   /** 선택 항목이 있을 때만 활성 */
   selection: { count: number; hasFile: boolean };
+  /** 읽기 전용 저장소: 새 폴더·업로드·이름 변경·삭제를 끈다 */
+  readOnly: boolean;
   download(): void;
   share(): void;
   rename(): void;
@@ -59,10 +61,10 @@ export function MenuBar(a: MenuActions) {
         <MenubarMenu>
           <MenubarTrigger className="h-7 rounded-md px-2.5 text-sm font-normal">파일</MenubarTrigger>
           <MenubarContent className="min-w-56">
-            <MenubarItem onClick={a.newFolder} className={item}>
+            <MenubarItem disabled={a.readOnly} onClick={a.newFolder} className={item}>
               새 폴더<MenubarShortcut>{MOD}+Shift+N</MenubarShortcut>
             </MenubarItem>
-            <MenubarItem onClick={a.upload} className={item}>
+            <MenubarItem disabled={a.readOnly} onClick={a.upload} className={item}>
               파일 업로드…
             </MenubarItem>
             <MenubarItem onClick={a.trash} className={item}>
@@ -78,10 +80,10 @@ export function MenuBar(a: MenuActions) {
             <MenubarItem onClick={a.shareLinks} className={item}>
               공유 링크 관리…
             </MenubarItem>
-            <MenubarItem disabled={a.selection.count !== 1} onClick={a.rename} className={item}>
+            <MenubarItem disabled={a.readOnly || a.selection.count !== 1} onClick={a.rename} className={item}>
               이름 변경<MenubarShortcut>F2</MenubarShortcut>
             </MenubarItem>
-            <MenubarItem disabled={!has} onClick={a.remove} variant="destructive" className={item}>
+            <MenubarItem disabled={a.readOnly || !has} onClick={a.remove} variant="destructive" className={item}>
               삭제<MenubarShortcut>Del</MenubarShortcut>
             </MenubarItem>
             <MenubarSeparator />

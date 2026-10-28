@@ -14,16 +14,19 @@ interface Props {
   children: ReactNode;
   onFiles(tasks: UploadTask[]): void;
   handle?: Ref<DropZoneHandle>;
+  /** 읽기 전용 저장소: 끌어다 놓기·파일 선택을 끈다 */
+  disabled?: boolean;
 }
 
-export function DropZone({ targetDir, children, onFiles, handle }: Props) {
+export function DropZone({ targetDir, children, onFiles, handle, disabled }: Props) {
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     noClick: true,
     noKeyboard: true,
+    disabled,
     useFsAccessApi: false,
     onDrop: (files) => files.length && onFiles(toUploadTasks(files, targetDir)),
   });
-  useImperativeHandle(handle, () => ({ open }), [open]);
+  useImperativeHandle(handle, () => ({ open: disabled ? () => {} : open }), [open, disabled]);
 
   return (
     <div {...getRootProps({ className: "relative flex min-h-0 flex-1 flex-col outline-none" })}>

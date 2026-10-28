@@ -25,6 +25,8 @@ export interface BackgroundMenuActions {
   setView(v: ViewMode): void;
   sort: Sort;
   setSort(s: Sort): void;
+  /** 읽기 전용 저장소: 새 폴더·업로드를 끈다 */
+  readOnly?: boolean;
 }
 
 interface Props {
@@ -47,11 +49,11 @@ export function BackgroundContextMenu({ actions: a, trigger, children, disabled,
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="min-w-48">
-        <ContextMenuItem onClick={a.newFolder} className="text-sm">
+        <ContextMenuItem disabled={a.readOnly} onClick={a.newFolder} className="text-sm">
           <IconFolderPlus className="size-4" /> 새 폴더
           <ContextMenuShortcut>{mod}+Shift+N</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onClick={a.upload} className="text-sm">
+        <ContextMenuItem disabled={a.readOnly} onClick={a.upload} className="text-sm">
           <IconUpload className="size-4" /> 파일 업로드…
         </ContextMenuItem>
         <ContextMenuSeparator />

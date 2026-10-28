@@ -39,6 +39,9 @@ objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSG
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphics", "NSGraphicsContext", "objc2-uniform-type-identifiers"] }
 objc2-uniform-type-identifiers = { version = "0.3", features = ["UTType", "UTCoreTypes"] }
 
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2"
+
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

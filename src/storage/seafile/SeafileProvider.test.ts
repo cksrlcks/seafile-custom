@@ -41,16 +41,16 @@ describe("SeafileProvider", () => {
             { id: "a", name: "집-공유", type: "repo", size: 0, mtime: 1, encrypted: false },
             { id: "b", name: "내 라이브러리", type: "repo", size: 0, mtime: 1, encrypted: false },
             { id: "a", name: "집-공유", type: "grepo", group_name: "집", size: 0, mtime: 1, encrypted: false },
-            { id: "c", name: "받은 것", type: "srepo", size: 0, mtime: 1, encrypted: false },
-            { id: "d", name: "팀 드라이브", type: "grepo", group_name: "디자인팀", size: 0, mtime: 1, encrypted: false },
+            { id: "c", name: "받은 것", type: "srepo", permission: "rw", size: 0, mtime: 1, encrypted: false },
+            { id: "d", name: "팀 드라이브", type: "grepo", group_name: "디자인팀", permission: "r", size: 0, mtime: 1, encrypted: false },
           ]),
     );
     const libs = await new SeafileProvider("https://host.example", "t").listLibraries();
-    expect(libs.map((l) => [l.id, l.section, l.starred])).toEqual([
-      ["a", "내 저장소", false],
-      ["b", "내 저장소", false],
-      ["c", "나에게 공유됨", false],
-      ["d", "나에게 공유됨", true],
+    expect(libs.map((l) => [l.id, l.section, l.starred, l.readOnly])).toEqual([
+      ["a", "내 저장소", false, false],
+      ["b", "내 저장소", false, false],
+      ["c", "나에게 공유됨", false, false],
+      ["d", "나에게 공유됨", true, true],
     ]);
   });
 

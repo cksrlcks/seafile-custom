@@ -1,100 +1,56 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { loginErrorMessage } from "@/features/auth/loginError";
-import { useSession, useStorage } from "@/storage/StorageContext";
-import { connectionFor } from "@/storage/session";
+import { useEffect, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { isTauri } from "@/features/shell/platform";
 
 interface Props {
   open: boolean;
   onClose(): void;
 }
 
-/** 설정: 서버 주소·계정 변경 = 새 정보로 다시 로그인. 비밀번호는 저장하지 않는다. */
+/** 설정: 앱 동작 옵션. 서버·계정 변경은 로그아웃 후 로그인 화면에서 한다 */
 export function SettingsDialog({ open, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="text-sm sm:max-w-md">{open && <Body onClose={onClose} />}</DialogContent>
+      <DialogContent showCloseButton className="text-sm sm:max-w-sm">{open && <Body />}</DialogContent>
     </Dialog>
   );
 }
 
-function Body({ onClose }: { onClose(): void }) {
-  const { session, login } = useSession();
-  const storage = useStorage();
-  const account = useQuery({ queryKey: ["account"], queryFn: () => storage.getAccount(), staleTime: 30_000 });
-  const [baseUrl, setBaseUrl] = useState(session.connection.baseUrl);
-  const [username, setUsername] = useState(account.data?.email ?? "");
-  const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpRequired, setOtpRequired] = useState(false);
+function Body() {
+  // null = 아직 모름(확인 중이거나 설치된 앱이 아님)
+  const [autostart, setAutostart] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const urlChanged = baseUrl.trim().replace(/\/+$/, "") !== session.connection.baseUrl;
+  useEffect(() => {
+    if (!isTauri()) return;
+    void import("@tauri-apps/plugin-autostart").then((a) => a.isEnabled()).then(setAutostart, () => setAutostart(false));
+  }, []);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+  async function toggle(on: boolean) {
     setError(null);
     try {
-      await login(connectionFor(baseUrl), username, password, otp || undefined);
-      onClose();
-    } catch (err) {
-      const info = loginErrorMessage(err);
-      setError(info.message);
-      if (info.otpRequired) setOtpRequired(true);
-    } finally {
-      setBusy(false);
+      const a = await import("@tauri-apps/plugin-autostart");
+      await (on ? a.enable() : a.disable());
+      setAutostart(await a.isEnabled());
+    } catch (e) {
+      setError(`바꾸지 못했습니다 (${e instanceof Error ? e.message : String(e)})`);
     }
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <DialogHeader>
         <DialogTitle>설정</DialogTitle>
-        <DialogDescription>서버 주소나 계정을 바꾸면 새 정보로 다시 연결합니다.</DialogDescription>
       </DialogHeader>
-
-      <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-        현재 연결: <span className="text-foreground">{session.connection.baseUrl}</span>
-        {account.data && (
-          <>
-            {" · "}
-            <span className="text-foreground">{account.data.name}</span> ({account.data.email})
-          </>
-        )}
-      </div>
-
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        서버 주소
-        <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." required />
+      <label className="flex items-start gap-2.5">
+        <Checkbox checked={!!autostart} disabled={autostart === null} onCheckedChange={(v) => void toggle(!!v)} className="mt-0.5" />
+        <span className="flex flex-col gap-0.5">
+          <span>컴퓨터를 켜면 Drive 자동 실행</span>
+          <span className="text-xs text-muted-foreground">창 없이 트레이(메뉴 막대)에서 시작합니다</span>
+        </span>
       </label>
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        아이디
-        <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder={account.data?.email ?? ""} required />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        비밀번호
-        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-      </label>
-      {otpRequired && (
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          2단계 인증 코드
-          <Input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" autoFocus />
-        </label>
-      )}
+      {!isTauri() && <p className="text-xs text-muted-foreground">설치된 앱에서만 바꿀 수 있습니다</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-
-      <DialogFooter>
-        <Button type="button" variant="outline" size="sm" onClick={onClose}>
-          취소
-        </Button>
-        <Button type="submit" size="sm" disabled={busy}>
-          {busy ? "연결 중..." : urlChanged ? "저장하고 다시 연결" : "저장"}
-        </Button>
-      </DialogFooter>
-    </form>
+    </div>
   );
 }

@@ -86,10 +86,10 @@ export function TitleBar({ menu: m, crumbs, onNavigate, onSearchPick, disabled }
         <IconBtn label="새로고침" shortcut="F5" onClick={m.refresh} disabled={disabled}>
           <IconRefresh className="size-4" stroke={1.75} />
         </IconBtn>
-        <IconBtn label="새 폴더" shortcut={`${modKey()}+Shift+N`} onClick={m.newFolder} disabled={disabled}>
+        <IconBtn label="새 폴더" shortcut={`${modKey()}+Shift+N`} onClick={m.newFolder} disabled={disabled || m.readOnly}>
           <IconFolderPlus className="size-4" stroke={1.75} />
         </IconBtn>
-        <Button size="sm" onClick={m.upload} disabled={disabled} className="mx-1 h-7 rounded-md px-2.5">
+        <Button size="sm" onClick={m.upload} disabled={disabled || m.readOnly} className="mx-1 h-7 rounded-md px-2.5">
           <IconUpload className="size-3.5" stroke={2} /> 업로드
         </Button>
 

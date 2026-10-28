@@ -6,9 +6,10 @@ import type { Entry } from "@/storage/StorageProvider";
 export interface EntryMenuActions {
   onOpen(entry: Entry): void;
   onDownload(entry: Entry): void;
-  onRename(entry: Entry): void;
+  /** 읽기 전용 저장소면 없음(메뉴 항목이 꺼진다) */
+  onRename?(entry: Entry): void;
   onShare?(entry: Entry): void;
-  onDelete(entry: Entry): void;
+  onDelete?(entry: Entry): void;
 }
 
 interface Props {
@@ -40,7 +41,7 @@ export function EntryContextMenu({ entry, actions, children, asRow, className, o
             <IconDownload className="size-4" /> 다운로드
           </ContextMenuItem>
         )}
-        <ContextMenuItem onClick={() => actions.onRename(entry)} className="text-sm">
+        <ContextMenuItem disabled={!actions.onRename} onClick={() => actions.onRename?.(entry)} className="text-sm">
           <IconPencil className="size-4" /> 이름 변경
           <ContextMenuShortcut>F2</ContextMenuShortcut>
         </ContextMenuItem>
@@ -48,7 +49,7 @@ export function EntryContextMenu({ entry, actions, children, asRow, className, o
           <IconLink className="size-4" /> 공유 링크
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => actions.onDelete(entry)} className="text-sm">
+        <ContextMenuItem variant="destructive" disabled={!actions.onDelete} onClick={() => actions.onDelete?.(entry)} className="text-sm">
           <IconTrash className="size-4" /> 삭제
           <ContextMenuShortcut>Del</ContextMenuShortcut>
         </ContextMenuItem>

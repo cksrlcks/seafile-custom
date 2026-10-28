@@ -28,10 +28,12 @@ type FileProps = {
   onRename(): void;
   onDelete(): void;
   onClear(): void;
+  /** 읽기 전용 저장소: 이름 변경·삭제를 끈다 */
+  readOnly?: boolean;
 };
 
 /** 파일 목록용. 메뉴바 편집 메뉴와 같은 동작·활성 조건 */
-export function FileSelectionBar({ count, hasFile, onDownload, onShare, onRename, onDelete, onClear }: FileProps) {
+export function FileSelectionBar({ count, hasFile, onDownload, onShare, onRename, onDelete, onClear, readOnly }: FileProps) {
   return (
     <SelectionBar count={count} onClear={onClear}>
       <Button variant="ghost" size="sm" onClick={onDownload} disabled={!hasFile} className="px-3">
@@ -40,10 +42,10 @@ export function FileSelectionBar({ count, hasFile, onDownload, onShare, onRename
       <Button variant="ghost" size="sm" onClick={onShare} disabled={count !== 1} className="px-3">
         <IconLink className="size-4" stroke={1.75} /> 공유 링크
       </Button>
-      <Button variant="ghost" size="sm" onClick={onRename} disabled={count !== 1} className="px-3">
+      <Button variant="ghost" size="sm" onClick={onRename} disabled={readOnly || count !== 1} className="px-3">
         <IconPencil className="size-4" stroke={1.75} /> 이름 변경
       </Button>
-      <Button variant="ghost" size="sm" onClick={onDelete} className="px-3 text-destructive hover:text-destructive">
+      <Button variant="ghost" size="sm" onClick={onDelete} disabled={readOnly} className="px-3 text-destructive hover:text-destructive">
         <IconTrash className="size-4" stroke={1.75} /> 삭제
       </Button>
     </SelectionBar>
