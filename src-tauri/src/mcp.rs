@@ -31,13 +31,15 @@ pub struct Hub {
     pending: Mutex<Option<Vec<(u64, String)>>>,
     /// WebView에 넘겼지만 아직 답이 없는 요청 (연결, JSON id). 새로고침 때 오류로 끝내려고 기억한다
     inflight: Mutex<HashSet<(u64, String)>>,
+    /// 연결 수가 바뀔 때 (사이드바의 "Claude 연결됨" 표시용)
+    on_count: std::sync::OnceLock<Box<dyn Fn(usize) + Send + Sync>>,
 }
 
 impl Hub {
     pub fn start(token: String, on_line: impl Fn(u64, String) + Send + Sync + 'static) -> io::Result<(Arc<Hub>, u16)> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr()?.port();
-        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())), inflight: Default::default() });
+        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())), inflight: Default::default(), on_count: Default::default() });
         let h = hub.clone();
         std::thread::spawn(move || {
             for (id, stream) in (1u64..).zip(listener.incoming()) {
@@ -57,6 +59,7 @@ impl Hub {
             _ => return, // 토큰이 틀리면 두 핸들이 모두 drop되어 연결이 닫힌다
         }
         self.conns.lock().unwrap().insert(id, write);
+        self.notify_count();
         for line in lines {
             let Ok(line) = line else { break };
             let line = line.trim_end_matches('\r');
@@ -65,6 +68,21 @@ impl Hub {
             }
         }
         self.conns.lock().unwrap().remove(&id);
+        self.notify_count();
+    }
+
+    pub fn connections(&self) -> usize {
+        self.conns.lock().unwrap().len()
+    }
+
+    pub fn on_count(&self, f: impl Fn(usize) + Send + Sync + 'static) {
+        let _ = self.on_count.set(Box::new(f));
+    }
+
+    fn notify_count(&self) {
+        if let Some(f) = self.on_count.get() {
+            f(self.connections());
+        }
     }
 
     fn dispatch(&self, id: u64, line: String) {
@@ -284,6 +302,10 @@ pub fn setup(app: &AppHandle) {
         Ok(v) => v,
         Err(e) => return eprintln!("MCP 리스너를 열지 못했습니다: {e}"),
     };
+    let handle = app.clone();
+    hub.on_count(move |n| {
+        let _ = handle.emit("mcp-connections", n);
+    });
     if let Some(path) = mcp_json_path() {
         let _ = std::fs::create_dir_all(path.parent().unwrap());
         let _ = std::fs::write(&path, serde_json::json!({ "port": port, "token": token }).to_string());
@@ -294,6 +316,12 @@ pub fn setup(app: &AppHandle) {
 #[tauri::command]
 pub fn mcp_ready(hub: State<Arc<Hub>>) {
     hub.set_ready();
+}
+
+/// 지금 연결된 Claude 수. 화면은 mcp-connections 이벤트를 먼저 듣고 이걸로 처음 값을 읽는다
+#[tauri::command]
+pub fn mcp_connections(hub: State<Arc<Hub>>) -> usize {
+    hub.connections()
 }
 
 #[tauri::command]
@@ -360,6 +388,20 @@ mod tests {
         let mut buf = [0u8; 8];
         assert_eq!(s.read(&mut buf).unwrap_or(0), 0);
         assert!(seen.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn hub_reports_connection_count() {
+        let (hub, port, _) = recording_hub();
+        let counts: Arc<Mutex<Vec<usize>>> = Default::default();
+        let c = counts.clone();
+        hub.on_count(move |n| c.lock().unwrap().push(n));
+        let _wrong = client(port, "wrong");
+        let s = client(port, "tok");
+        assert!(wait_until(|| hub.connections() == 1));
+        drop(s);
+        assert!(wait_until(|| hub.connections() == 0));
+        assert_eq!(*counts.lock().unwrap(), vec![1, 0], "토큰이 틀린 연결은 세지 않는다");
     }
 
     #[test]

@@ -262,39 +262,85 @@ function GeneralPage() {
 function ClaudePage() {
   const app = isTauri();
   const [exe, setExe] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const status = useQuery({ queryKey: ["claude-status"], queryFn: () => invoke<{ code: boolean; desktop: boolean }>("claude_status"), enabled: app });
   useEffect(() => {
-    if (!app) return;
-    void import("@tauri-apps/api/core").then(({ invoke }) => invoke<string>("exe_path")).then(setExe);
+    if (app) void invoke<string>("exe_path").then(setExe);
   }, [app]);
   if (!app) return <p className="text-sm text-muted-foreground">설치된 앱에서만 쓸 수 있습니다</p>;
 
-  const openDir = () =>
-    import("@tauri-apps/api/core")
-      .then(({ invoke }) => invoke("open_claude_config_dir"))
-      .then(() => setError(null), (e: unknown) => setError(`열지 못했습니다 (${e instanceof Error ? e.message : String(e)})`));
-
   return (
     <>
-      <p className="mb-6 text-sm text-muted-foreground">Claude에 Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. Drive 앱이 켜져 있고 로그인돼 있어야 합니다.</p>
+      <p className="mb-6 text-sm text-muted-foreground">Claude에 Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, Drive 앱에 로그인돼 있어야 합니다.</p>
       <Section title="Claude Code">
-        <Snippet desc="터미널에서 한 번 실행하세요" code={`claude mcp add --scope user drive -- "${exe}" --mcp`} />
+        <ConnectRow
+          title="Claude Code"
+          connected={status.data?.code}
+          command="connect_claude_code"
+          done="연결했습니다. Claude Code를 새로 열면 쓸 수 있습니다."
+          onDone={() => void status.refetch()}
+          manual={<Snippet desc="터미널에서 직접 실행해도 됩니다" code={`claude mcp add --scope user drive -- "${exe}" --mcp`} />}
+        />
       </Section>
       <Section title="Claude 데스크톱 앱">
-        <Snippet
-          desc={error ? <span className="text-destructive">{error}</span> : "claude_desktop_config.json에 붙여 넣은 뒤 Claude 데스크톱 앱을 다시 시작하세요. 이미 다른 서버가 있으면 mcpServers 안에 drive 항목만 추가하세요."}
-          code={JSON.stringify({ mcpServers: { drive: { command: exe, args: ["--mcp"] } } }, null, 2)}
-        >
-          <button type="button" onClick={() => void openDir()} className={btnOutline}>
-            설정 폴더 열기
-          </button>
-        </Snippet>
+        <ConnectRow
+          title="Claude 데스크톱 앱"
+          connected={status.data?.desktop}
+          command="connect_claude_desktop"
+          done="연결했습니다. Claude 데스크톱 앱을 완전히 종료한 뒤(트레이 아이콘 → 종료) 다시 여세요."
+          onDone={() => void status.refetch()}
+          manual={
+            <Snippet
+              desc="Claude 데스크톱 앱 → 설정 → 개발자 → 구성 편집으로 연 claude_desktop_config.json의 mcpServers에 drive 항목을 직접 넣어도 됩니다"
+              code={JSON.stringify({ mcpServers: { drive: { command: exe, args: ["--mcp"] } } }, null, 2)}
+            />
+          }
+        />
       </Section>
     </>
   );
 }
 
-function Snippet({ desc, code, children }: { desc: ReactNode; code: string; children?: ReactNode }) {
+async function invoke<T>(cmd: string): Promise<T> {
+  return (await import("@tauri-apps/api/core")).invoke<T>(cmd);
+}
+
+/** 연결 상태와 연결 버튼. 연결에 실패하면 직접 등록하는 방법을 펼친다 */
+function ConnectRow({ title, connected, command, done, onDone, manual }: { title: string; connected: boolean | undefined; command: string; done: string; onDone(): void; manual: ReactNode }) {
+  const [state, setState] = useState<{ busy?: boolean; ok?: boolean; error?: string }>({});
+  const connect = () => {
+    setState({ busy: true });
+    invoke(command).then(
+      () => {
+        setState({ ok: true });
+        onDone();
+      },
+      (e: unknown) => setState({ error: e instanceof Error ? e.message : String(e) }),
+    );
+  };
+  const desc = state.error ? (
+    <span className="text-destructive">연결하지 못했습니다 ({state.error})</span>
+  ) : state.ok ? (
+    done
+  ) : connected ? (
+    <span className="flex items-center gap-1.5">
+      <span className="size-2 rounded-full bg-success" /> 연결됨
+    </span>
+  ) : (
+    "연결 안 됨"
+  );
+  return (
+    <>
+      <Row title={title} desc={desc}>
+        <button type="button" disabled={state.busy} onClick={connect} className={btnOutline}>
+          {state.busy ? "연결 중…" : connected ? "다시 연결" : "연결"}
+        </button>
+      </Row>
+      {state.error && manual}
+    </>
+  );
+}
+
+function Snippet({ desc, code }: { desc: ReactNode; code: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () =>
     navigator.clipboard.writeText(code).then(() => {
@@ -309,7 +355,6 @@ function Snippet({ desc, code, children }: { desc: ReactNode; code: string; chil
         <button type="button" onClick={() => void copy()} className={btnOutline}>
           {copied ? "복사됨" : "복사"}
         </button>
-        {children}
       </span>
     </div>
   );

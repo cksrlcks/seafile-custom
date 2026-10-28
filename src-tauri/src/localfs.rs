@@ -1,9 +1,7 @@
 //! MCP 도구가 쓰는 로컬 파일 접근 (올릴 파일 읽기, 최근 다운로드, Claude 연결 안내)
 
 use serde::Serialize;
-use std::path::{Path, PathBuf};
-use tauri::AppHandle;
-use tauri_plugin_opener::OpenerExt;
+use std::path::Path;
 
 const READ_CAP: u64 = 200 * 1024 * 1024;
 
@@ -57,22 +55,10 @@ pub fn exe_path() -> String {
     std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-/// Claude 데스크톱 앱 설정 폴더(claude_desktop_config.json이 있는 곳)를 연다. 없으면 만든다
-#[tauri::command]
-pub fn open_claude_config_dir(app: AppHandle) -> Result<(), String> {
-    let base = if cfg!(windows) {
-        std::env::var_os("APPDATA").map(PathBuf::from)
-    } else {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Application Support"))
-    };
-    let dir = base.ok_or("설정 폴더를 찾을 수 없습니다")?.join("Claude");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn temp_dir(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("seadrive-localfs-{name}-{}", std::process::id()));
