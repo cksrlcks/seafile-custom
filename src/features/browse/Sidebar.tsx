@@ -2,7 +2,6 @@ import { IconChevronDown, IconCloud, IconLink, IconLock, IconPencil, IconStar, I
 import { cn } from "cn";
 import { useState, type ReactNode } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { useClaudeClients } from "@/features/mcp/useClaudeClients";
 import type { Library } from "@/storage/StorageProvider";
 import { InlineName } from "./InlineName";
 import type { Location } from "./useCurrentDir";
@@ -48,7 +47,6 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onStarLib
   /** 이름 변경 중인 저장소 id */
   const [renaming, setRenaming] = useState<string | null>(null);
   const [collapsed, toggleSection] = useCollapsed();
-  const claude = useClaudeClients();
   const names = libraries?.map((l) => l.name) ?? [];
   // 즐겨찾기 → 내 저장소 → 나에게 공유됨. 즐겨찾기한 저장소는 원래 섹션에도 그대로 둔다
   const sections = new Map<string, Library[]>([["즐겨찾기", []], ["내 저장소", []]]);
@@ -99,14 +97,6 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onStarLib
         </div>
       ))}
       <div className="mt-auto border-t border-sidebar-border pt-2">
-        {claude.length > 0 && (
-          <div className="mb-1 flex h-7 items-center gap-2 px-2 text-xs text-muted-foreground" title="Claude에서 드라이브에 파일을 올리고 받을 수 있습니다">
-            <span className="flex size-4 shrink-0 items-center justify-center">
-              <span className="size-2 rounded-full bg-success" />
-            </span>
-            <span className="truncate">{claude.join(" · ")} 연결됨</span>
-          </div>
-        )}
         <Row icon={<IconLink className="size-4" />} label="공유 링크" selected={page === "links"} onClick={onShareLinks} />
         <Row icon={<IconTrash className="size-4" />} label="휴지통" selected={page === "trash"} disabled={loc.libId === null} title={loc.libId === null ? "저장소를 먼저 선택하세요" : undefined} onClick={onTrash} />
       </div>
