@@ -55,15 +55,29 @@ export class SeafileProvider implements StorageProvider {
   async listLibraries(): Promise<Library[]> {
     // 같은 저장소가 소유(repo)·공유(srepo)·그룹(grepo)으로 여러 번 온다. 한 섹션에만 두되 소유 > 그룹 > 공유 순으로 고른다
     const rank = (r: RepoDto) => (r.type === "srepo" ? 2 : r.type === "grepo" ? 1 : 0);
+    const [repos, starred] = await Promise.all([
+      this.api.get<RepoDto[]>("/api2/repos/"),
+      // 즐겨찾기를 못 받아도 저장소 목록은 보여 준다
+      this.api.get<{ starred_item_list: { repo_id: string; path: string }[] }>("/api/v2.1/starred-items/").then(
+        (s) => new Set(s.starred_item_list.filter((i) => i.path === "/").map((i) => i.repo_id)),
+        () => new Set<string>(),
+      ),
+    ]);
     const byId = new Map<string, RepoDto>();
-    for (const r of await this.api.get<RepoDto[]>("/api2/repos/")) {
+    for (const r of repos) {
       const prev = byId.get(r.id);
       if (!prev || rank(r) < rank(prev)) byId.set(r.id, r);
     }
     return [...byId.values()].map((r) => ({
       id: r.id, name: r.name, size: r.size, mtime: r.mtime, encrypted: !!r.encrypted, headCommitId: r.head_commit_id,
-      section: r.type === "grepo" ? r.group_name || "그룹" : r.type === "srepo" ? "나에게 공유됨" : "내 저장소",
+      section: r.type === "grepo" || r.type === "srepo" ? "나에게 공유됨" : "내 저장소",
+      starred: starred.has(r.id),
     }));
+  }
+
+  async starLibrary(libId: string, starred: boolean): Promise<void> {
+    if (starred) await this.api.postForm("/api/v2.1/starred-items/", { repo_id: libId, path: "/" });
+    else await this.api.delete("/api/v2.1/starred-items/", { repo_id: libId, path: "/" });
   }
 
   async renameLibrary(libId: string, newName: string): Promise<void> {

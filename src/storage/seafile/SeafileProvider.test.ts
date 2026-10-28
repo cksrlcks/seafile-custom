@@ -33,17 +33,33 @@ describe("SeafileProvider", () => {
     expect(entries[0].type).toBe("dir");
   });
 
-  it("listLibraries keeps an owned repo under 내 저장소 even when it is also in a group", async () => {
-    fetchMock.mockResolvedValue(
-      json([
-        { id: "a", name: "집-공유", type: "repo", size: 0, mtime: 1, encrypted: false },
-        { id: "b", name: "내 라이브러리", type: "repo", size: 0, mtime: 1, encrypted: false },
-        { id: "a", name: "집-공유", type: "grepo", group_name: "집", size: 0, mtime: 1, encrypted: false },
-        { id: "c", name: "받은 것", type: "srepo", size: 0, mtime: 1, encrypted: false },
-      ]),
+  it("listLibraries: owned → 내 저장소, group/shared → 나에게 공유됨, starred roots marked", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes("/starred-items/")
+        ? json({ starred_item_list: [{ repo_id: "d", path: "/" }, { repo_id: "b", path: "/sub" }] })
+        : json([
+            { id: "a", name: "집-공유", type: "repo", size: 0, mtime: 1, encrypted: false },
+            { id: "b", name: "내 라이브러리", type: "repo", size: 0, mtime: 1, encrypted: false },
+            { id: "a", name: "집-공유", type: "grepo", group_name: "집", size: 0, mtime: 1, encrypted: false },
+            { id: "c", name: "받은 것", type: "srepo", size: 0, mtime: 1, encrypted: false },
+            { id: "d", name: "팀 드라이브", type: "grepo", group_name: "디자인팀", size: 0, mtime: 1, encrypted: false },
+          ]),
     );
     const libs = await new SeafileProvider("https://host.example", "t").listLibraries();
-    expect(libs.map((l) => [l.id, l.section])).toEqual([["a", "내 저장소"], ["b", "내 저장소"], ["c", "나에게 공유됨"]]);
+    expect(libs.map((l) => [l.id, l.section, l.starred])).toEqual([
+      ["a", "내 저장소", false],
+      ["b", "내 저장소", false],
+      ["c", "나에게 공유됨", false],
+      ["d", "나에게 공유됨", true],
+    ]);
+  });
+
+  it("listLibraries still lists libraries when starred items fail", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes("/starred-items/") ? json({ error_msg: "nope" }, 500) : json([{ id: "a", name: "a", type: "repo", size: 0, mtime: 1, encrypted: false }]),
+    );
+    const libs = await new SeafileProvider("https://host.example", "t").listLibraries();
+    expect(libs.map((l) => l.id)).toEqual(["a"]);
   });
 });
 

@@ -4,8 +4,10 @@ export interface Library {
   size: number;
   mtime: number;
   encrypted: boolean;
-  /** 사이드바 섹션 이름: "내 저장소", "나에게 공유됨", 또는 그룹 이름 */
+  /** 사이드바 섹션 이름: "내 저장소" 또는 "나에게 공유됨"(개인·그룹 공유 모두) */
   section: string;
+  /** 즐겨찾기. 사이드바 맨 위 "즐겨찾기" 섹션에 둔다 */
+  starred?: boolean;
   /** 내용이 바뀔 때마다 달라지는 서버 식별자. 검색 인덱스 갱신 판단용 */
   headCommitId?: string;
 }
@@ -99,6 +101,7 @@ export interface StorageProvider {
   getAccount(): Promise<Account>;
   listLibraries(): Promise<Library[]>;
   renameLibrary(libId: string, newName: string): Promise<void>;
+  starLibrary(libId: string, starred: boolean): Promise<void>;
   listDir(libId: string, path: string): Promise<Entry[]>;
   /** 저장소 전체의 파일·폴더를 한 번에(검색 인덱스용) */
   listTree(libId: string): Promise<Entry[]>;

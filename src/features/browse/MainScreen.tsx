@@ -136,6 +136,10 @@ export function MainScreen() {
     mutationFn: ({ lib, newName }: { lib: Library; newName: string }) => storage.renameLibrary(lib.id, newName),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["libraries"] }),
   });
+  const starLibrary = useMutation({
+    mutationFn: ({ lib, starred }: { lib: Library; starred: boolean }) => storage.starLibrary(lib.id, starred),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["libraries"] }),
+  });
   const renameFolder = useMutation({
     mutationFn: ({ libId, path, newName }: { libId: string; path: string; newName: string }) => storage.rename(libId, path, newName, "dir"),
     onSuccess: (_d, { libId, path }) => qc.invalidateQueries({ queryKey: ["dir", libId, parentPath(path)] }),
@@ -299,6 +303,7 @@ export function MainScreen() {
               loc={loc}
               onNavigate={setLoc}
               onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
+              onStarLibrary={(lib, starred) => starLibrary.mutate({ lib, starred })}
               onRenameFolder={(libId, path, newName) =>
                 renameFolder.mutate({ libId, path, newName }, {
                   onSuccess: () => {
