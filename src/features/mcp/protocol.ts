@@ -3,7 +3,7 @@ import { callTool, TOOLS, type ToolCtx, type ToolResult } from "./tools";
 
 /** initialize 응답으로 Claude에게 주는 안내. Claude의 행동(먼저 묻기·위치 제안·확인 후 업로드)은 이것으로 유도한다 */
 export const INSTRUCTIONS = [
-  "Drive는 사용자의 회사 드라이브(Seafile)에 파일을 올리고 받는 도구다.",
+  "Drive는 사용자의 회사 드라이브에 파일을 올리고 받는 도구다.",
   "사용자가 문서 작성이나 수정을 끝내면, 먼저 '드라이브에도 올릴까요?'라고 물어본다.",
   "올리기 전에 list_libraries와 list_dir로 사용자 본인 저장소(section '내 저장소')의 기존 폴더 구조를 보고, 그에 맞는 폴더 경로를 제안한다. 새 폴더가 필요하면 '이 폴더를 만들어서 올릴까요?'라고 말한다.",
   "사용자가 확인하기 전에는 절대 upload_file·upload_text를 호출하지 않는다.",
@@ -58,6 +58,6 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
     return await callTool(name, args, ctx);
   } catch (e) {
     if (e instanceof StorageError && e.kind === "unauthorized") return LOGIN;
-    return { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
+    return { content: [{ type: "text", text: String(e) }], isError: true };
   }
 }
