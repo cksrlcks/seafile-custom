@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .superpowers/
 .playwright-cli/
+
+# Claude Code가 로컬 플러그인의 .mcpb를 풀어 두는 캐시
+.mcpb-cache/

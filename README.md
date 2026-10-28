@@ -17,6 +17,21 @@ macOS는 ad-hoc 서명이라 처음 한 번 **시스템 설정 → 개인정보 
 
 설치한 뒤에는 앱이 새 버전을 스스로 확인하고 업데이트합니다.
 
+## Claude 연결
+
+Claude에서 "이 문서 유드라이브에 올려줘", "유드라이브에서 ○○ 받아줘"처럼 말로 파일을 올리고 받을 수 있습니다. 위의 U-Drive 앱이 설치돼 있고 로그인돼 있어야 합니다.
+
+**Claude Code** — 터미널에서 한 번 실행합니다.
+
+```
+claude plugin marketplace add cksrlcks/u-drive
+claude plugin install u-drive@u-drive
+```
+
+**Claude 데스크톱 앱** — [u-drive.mcpb](https://github.com/cksrlcks/u-drive/raw/main/claude-plugin/u-drive.mcpb)를 받아 더블클릭하면 Claude에 확장으로 설치됩니다.
+
+플러그인 파일은 [claude-plugin/](claude-plugin/)에 있습니다. `mcpb/manifest.json`을 고치면 그 폴더에서 `npx @anthropic-ai/mcpb pack . ../u-drive.mcpb`로 다시 만듭니다.
+
 ## 기능
 
 - **로그인**: 서버 주소 지정, 2단계 인증, 자동 로그인

@@ -1,0 +1,20 @@
+{
+  "manifest_version": "0.3",
+  "name": "u-drive",
+  "display_name": "U-Drive",
+  "version": "1.0.0",
+  "description": "PC에 설치된 U-Drive 앱으로 드라이브에 파일을 올리고 받습니다. U-Drive 앱이 설치돼 있고 로그인돼 있어야 합니다.",
+  "author": { "name": "chang" },
+  "server": {
+    "type": "binary",
+    "entry_point": "U-Drive 앱(이 번들에 들어 있지 않음)",
+    "mcp_config": {
+      "command": "/Applications/Drive.app/Contents/MacOS/seadrive",
+      "args": ["--mcp"],
+      "platform_overrides": {
+        "win32": { "command": "${HOME}/AppData/Local/Drive/seadrive.exe" }
+      }
+    }
+  },
+  "compatibility": { "platforms": ["win32", "darwin"] }
+}

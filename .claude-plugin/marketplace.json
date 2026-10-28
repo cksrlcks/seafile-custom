@@ -1,0 +1,11 @@
+{
+  "name": "u-drive",
+  "owner": { "name": "chang" },
+  "plugins": [
+    {
+      "name": "u-drive",
+      "source": "./claude-plugin",
+      "description": "Claude에서 U-Drive(유드라이브)에 파일을 올리고 받습니다. PC에 U-Drive 앱이 설치돼 있어야 합니다."
+    }
+  ]
+}
