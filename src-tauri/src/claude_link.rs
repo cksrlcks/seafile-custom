@@ -117,7 +117,7 @@ fn claude_candidates(home: Option<&Path>) -> Vec<PathBuf> {
     c
 }
 
-fn run_claude(bin: &Path, args: &[&str]) -> std::io::Result<std::process::Output> {
+fn run_hidden(bin: &Path, args: &[&str]) -> std::io::Result<std::process::Output> {
     let mut cmd = Command::new(bin);
     cmd.args(args).stdin(Stdio::null());
     #[cfg(windows)]
@@ -144,7 +144,28 @@ pub fn claude_status() -> Result<ClaudeStatus, String> {
 
 #[tauri::command]
 pub async fn connect_claude_desktop() -> Result<(), String> {
+    if desktop_running() {
+        return Err("Claude 데스크톱 앱이 켜져 있으면 연결이 지워집니다. 트레이 아이콘에서 Claude를 완전히 종료한 뒤 다시 눌러 주세요".into());
+    }
     connect_desktop_at(&desktop_config_files(), &exe()?)
+}
+
+/// Claude 데스크톱 앱의 실행 파일인가. Claude Code CLI도 이름이 claude.exe라 설치 위치로 가린다(MSIX: WindowsApps\Claude_*, 일반: AnthropicClaude)
+fn is_desktop_exe(path: &str) -> bool {
+    let p = path.to_lowercase();
+    p.contains(r"\windowsapps\claude_") || p.contains(r"\anthropicclaude\")
+}
+
+/// Claude 데스크톱 앱이 켜져 있으면 설정 파일을 자기 메모리 내용으로 다시 써서 우리가 넣은 항목을 지운다. 그래서 켜져 있을 땐 쓰지 않는다
+fn desktop_running() -> bool {
+    if cfg!(windows) {
+        run_hidden(Path::new("powershell"), &["-NoProfile", "-Command", "Get-Process claude -ErrorAction SilentlyContinue | ForEach-Object Path"])
+            .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).lines().any(is_desktop_exe))
+    } else if cfg!(target_os = "macos") {
+        run_hidden(Path::new("pgrep"), &["-x", "Claude"]).is_ok_and(|o| o.status.success()) // 데스크톱 앱 프로세스 이름은 Claude, CLI는 claude
+    } else {
+        false
+    }
 }
 
 /// `claude mcp add`로 등록한다. ~/.claude.json은 Claude Code가 수시로 다시 쓰는 파일이라 직접 고치지 않는다
@@ -154,11 +175,11 @@ pub async fn connect_claude_code() -> Result<(), String> {
     let home = env_path("HOME").or_else(|| env_path("USERPROFILE"));
     let old_is_mine = home.as_ref().is_some_and(|h| has_server(&std::fs::read_to_string(h.join(".claude.json")).unwrap_or_default(), OLD_NAME, &exe));
     for bin in claude_candidates(home.as_deref()) {
-        let Ok(_) = run_claude(&bin, &["mcp", "remove", NAME, "-s", "user"]) else { continue }; // 실행이 안 되면 다음 후보. 등록이 없어서 실패한 건 괜찮다
+        let Ok(_) = run_hidden(&bin, &["mcp", "remove", NAME, "-s", "user"]) else { continue }; // 실행이 안 되면 다음 후보. 등록이 없어서 실패한 건 괜찮다
         if old_is_mine {
-            let _ = run_claude(&bin, &["mcp", "remove", OLD_NAME, "-s", "user"]);
+            let _ = run_hidden(&bin, &["mcp", "remove", OLD_NAME, "-s", "user"]);
         }
-        let out = run_claude(&bin, &["mcp", "add", "--scope", "user", NAME, "--", &exe, "--mcp"]).map_err(|e| e.to_string())?;
+        let out = run_hidden(&bin, &["mcp", "add", "--scope", "user", NAME, "--", &exe, "--mcp"]).map_err(|e| e.to_string())?;
         if out.status.success() {
             return Ok(());
         }
@@ -210,6 +231,15 @@ mod tests {
         assert!(merge_drive(Some("{ broken"), "/a/Drive").is_err());
         assert!(merge_drive(Some("[]"), "/a/Drive").is_err());
         assert!(merge_drive(Some(r#"{"mcpServers":[]}"#), "/a/Drive").is_err());
+    }
+
+    #[test]
+    fn desktop_exe_is_not_claude_code() {
+        assert!(is_desktop_exe(r"C:\Program Files\WindowsApps\Claude_4.29.0.0_x64__pzs8sxrjxfjjc\app\claude.exe"));
+        assert!(is_desktop_exe(r"C:\Users\a\AppData\Local\AnthropicClaude\app-0.9.3\claude.exe"));
+        assert!(is_desktop_exe(r"c:\program files\windowsapps\claude_4.29.0.0_x64__p\app\Claude.exe"));
+        assert!(!is_desktop_exe(r"C:\Users\a\.local\bin\claude.exe"), "Claude Code CLI");
+        assert!(!is_desktop_exe(r"C:\Users\a\AppData\Local\Claude-Data\claude_x\claude-code\2.1.309\claude.exe"));
     }
 
     #[test]
