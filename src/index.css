@@ -290,3 +290,8 @@
   margin: 0 0.5em 0 0;
   vertical-align: middle;
 }
+
+/* 이미지 뷰어의 투명 영역 바탕. 테마와 상관없이 밝은 체커보드여야 검은·흰 그림이 모두 보인다 */
+@utility bg-checker {
+  background: repeating-conic-gradient(#e5e5e5 0 25%, #fff 0 50%) 0 0 / 16px 16px;
+}

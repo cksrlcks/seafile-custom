@@ -221,7 +221,8 @@ function ImageView({ libId, entry, view, scale, loaded, onLoad, onPan, onZoom, o
           alt={entry.name}
           draggable={false}
           onLoad={(e) => onLoad({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-          className={cn("absolute top-1/2 left-1/2 max-w-none shadow-float", !loaded && "invisible")}
+          // 투명 부분은 체커보드로 깔아야 어두운 뷰어 배경에서 검은 그림이 묻히지 않는다
+          className={cn("absolute top-1/2 left-1/2 max-w-none bg-checker shadow-float", !loaded && "invisible")}
           style={{ transform: `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) scale(${scale}) rotate(${view.rot}deg)` }}
         />
       )}
@@ -282,7 +283,7 @@ function Thumb({ libId, entry, active, onClick }: { libId: string; entry: Entry;
         active ? "ring-2 ring-primary" : "opacity-55 hover:opacity-100",
       )}
     >
-      {thumb ? <img src={thumb} alt="" draggable={false} className="size-full object-cover" /> : <EntryIcon entry={entry} size={48} className="size-8" />}
+      {thumb ? <img src={thumb} alt="" draggable={false} className="size-full bg-checker object-cover" /> : <EntryIcon entry={entry} size={48} className="size-8" />}
     </button>
   );
 }
