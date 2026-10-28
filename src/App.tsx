@@ -2,6 +2,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import { useMemo } from "react";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { MainScreen } from "@/features/browse/MainScreen";
+import { McpBridge, McpToolProvider } from "@/features/mcp/McpBridge";
 import { UploadQueueRoot } from "@/features/upload/useUploadQueue";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
@@ -28,6 +29,7 @@ function Gate() {
   );
   return <QueryClientProvider client={client}>{session.token ? (
         <UploadQueueRoot>
+          <McpToolProvider />
           <MainScreen />
         </UploadQueueRoot>
       ) : (
@@ -39,6 +41,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StorageRoot>
+        <McpBridge />
         <TooltipProvider delay={400}>
           <Gate />
         </TooltipProvider>
