@@ -22,7 +22,7 @@ import { useSession, useStorage } from "@/storage/StorageContext";
 import { useStoredState } from "@/lib/useStoredState";
 import { useMarquee } from "./useMarquee";
 import { useSidebarWidth } from "./useSidebarWidth";
-import { baseName, joinPath, parentPath, splitPath } from "@/storage/path";
+import { baseName, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
@@ -154,10 +154,6 @@ export function MainScreen() {
   const starLibrary = useMutation({
     mutationFn: ({ lib, starred }: { lib: Library; starred: boolean }) => storage.starLibrary(lib.id, starred),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["libraries"] }),
-  });
-  const renameFolder = useMutation({
-    mutationFn: ({ libId, path, newName }: { libId: string; path: string; newName: string }) => storage.rename(libId, path, newName, "dir"),
-    onSuccess: (_d, { libId, path }) => qc.invalidateQueries({ queryKey: ["dir", libId, parentPath(path)] }),
   });
   // ---- 끌어서 옮기기: 같은 저장소 안, 지금 폴더의 하위 폴더로만. 놓은 뒤 잠시 실행 취소를 띄운다 ----
   const [lastMove, setLastMove] = useState<MoveOp | null>(null);
@@ -379,16 +375,6 @@ export function MainScreen() {
               onNavigate={setLoc}
               onRenameLibrary={(lib, newName) => renameLibrary.mutate({ lib, newName })}
               onStarLibrary={(lib, starred) => starLibrary.mutate({ lib, starred })}
-              onRenameFolder={(libId, path, newName) =>
-                renameFolder.mutate({ libId, path, newName }, {
-                  onSuccess: () => {
-                    // 보고 있던 위치가 이름 바뀐 폴더 안이면 새 경로로 옮긴다
-                    if (loc.libId === libId && (loc.path === path || loc.path.startsWith(path + "/"))) {
-                      setLoc({ libId, path: joinPath(parentPath(path), newName) + loc.path.slice(path.length) });
-                    }
-                  },
-                })
-              }
             />
             {/* 사이드바 오른쪽 경계 위 4px 끌기 영역. 표 머리글의 열 조절과 같은 모양 */}
             <div role="separator" aria-orientation="vertical" onPointerDown={sidebar.startResize} className="group relative z-10 -ml-1 w-1 shrink-0 cursor-col-resize">
@@ -402,7 +388,6 @@ export function MainScreen() {
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {libs.error && <ErrorBanner message="저장소 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
           {renameLibrary.error && <ErrorBanner message={`저장소 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
-          {renameFolder.error && <ErrorBanner message={`폴더 이름을 바꾸지 못했습니다 (${(renameFolder.error as Error).message})`} actionLabel="닫기" onRetry={() => renameFolder.reset()} />}
           {dir.error && <ErrorBanner message="폴더를 불러오지 못했습니다" onRetry={() => dir.refetch()} />}
           {ops.error && <ErrorBanner message={`${ops.error.message} (${ops.error.detail})`} actionLabel="닫기" onRetry={ops.error.reset} />}
 
