@@ -17,6 +17,11 @@ export class SeafileApi {
     return this.request<T>("GET", path, query, undefined, undefined, signal);
   }
 
+  /** 이미지 등 JSON이 아닌 응답. Accept는 JSON 그대로 둔다(DRF가 image/*면 406) */
+  async getBlob(path: string, query?: Query, signal?: AbortSignal): Promise<Blob> {
+    return (await this.send("GET", path, query, undefined, undefined, signal)).blob();
+  }
+
   async postForm<T>(path: string, form: Record<string, string>, query?: Query, headers?: Query): Promise<T> {
     return this.request<T>("POST", path, query, new URLSearchParams(form), headers);
   }
@@ -26,6 +31,13 @@ export class SeafileApi {
   }
 
   private async request<T>(method: string, path: string, query?: Query, body?: BodyInit, extra?: Query, signal?: AbortSignal): Promise<T> {
+    const res = await this.send(method, path, query, body, extra, signal);
+    if (res.type === "opaqueredirect") return undefined as T;
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  }
+
+  private async send(method: string, path: string, query?: Query, body?: BodyInit, extra?: Query, signal?: AbortSignal): Promise<Response> {
     const headers = new Headers(extra);
     const token = this.getToken();
     if (token) headers.set("Authorization", `Token ${token}`);
@@ -39,7 +51,7 @@ export class SeafileApi {
       if ((e as Error).name === "AbortError") throw e;
       throw new StorageError("network", (e as Error).message);
     }
-    if (res.type === "opaqueredirect") return undefined as T;
+    if (res.type === "opaqueredirect") return res;
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       const kind = res.status === 401 ? "unauthorized" : res.status === 404 ? "notFound" : "server";
@@ -47,8 +59,7 @@ export class SeafileApi {
       if (res.headers.get("X-Seafile-OTP") === "required") err.message = "otp required";
       throw err;
     }
-    const text = await res.text();
-    return (text ? JSON.parse(text) : undefined) as T;
+    return res;
   }
 }
 

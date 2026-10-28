@@ -118,6 +118,8 @@ export interface StorageProvider {
   downloadUrl(libId: string, path: string): Promise<string>;
   previewUrl(libId: string, path: string): Promise<string>;
   readText(libId: string, path: string): Promise<string>;
+  /** 서버가 만든 이미지 썸네일. 썸네일을 못 만드는 파일이면 reject */
+  thumbnail(libId: string, path: string, size: number, signal?: AbortSignal): Promise<Blob>;
 
   mkdir(libId: string, path: string): Promise<void>;
   rename(libId: string, path: string, newName: string, type: "file" | "dir"): Promise<void>;

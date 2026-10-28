@@ -19,8 +19,8 @@ import { UploadPanel } from "@/features/upload/UploadPanel";
 import { DownloadPanel } from "@/features/download/DownloadPanel";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
+import { useStoredState } from "@/lib/useStoredState";
 import { useMarquee } from "./useMarquee";
-import { FileSelectionBar } from "./SelectionBar";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { joinPath, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
@@ -28,7 +28,8 @@ import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
 import { BackgroundContextMenu } from "./BackgroundContextMenu";
 import { FileList, FileListSkeleton, orderEntries, type Sort, type SortKey, type ViewMode } from "./FileList";
-import { IconGrid } from "./IconGrid";
+import { DetailsPanel } from "./DetailsPanel";
+import { ICON_SIZES, IconGrid } from "./IconGrid";
 import { Sidebar } from "./Sidebar";
 import { useCurrentDir, useLibraries, type Location } from "./useCurrentDir";
 import { useEntryActions } from "./useEntryActions";
@@ -63,6 +64,15 @@ export function MainScreen() {
     setSelected(new Set());
   };
 
+  // 마우스 뒤로·앞으로 버튼(탐색기처럼). go는 setState만 써서 한 번만 등록해도 된다
+  useEffect(() => {
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) (e.preventDefault(), go(e.button === 3 ? -1 : 1));
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+  }, []);
+
   useEffect(() => {
     if (loc.libId !== null || !libs.data) return;
     const first = libs.data.find((l) => !l.encrypted);
@@ -82,6 +92,8 @@ export function MainScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const sidebar = useSidebarWidth();
   const [view, setView] = useState<ViewMode>("list");
+  const [detailsOpen, setDetailsOpen] = useStoredState("seadrive.details", true);
+  const [iconSize, setIconSize] = useStoredState("seadrive.iconSize", 1);
   const [sort, setSort] = useState<Sort>({ key: "name", dir: "asc" });
   const entries = useMemo(() => orderEntries(dir.data ?? [], sort), [dir.data, sort]);
   const onSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
@@ -195,8 +207,14 @@ export function MainScreen() {
       listRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(t.path)}"]`)?.scrollIntoView({ block: "nearest" });
     };
     const mod = e.ctrlKey || e.metaKey;
-    if (e.key === "ArrowDown") (e.preventDefault(), moveTo(idx + 1));
-    else if (e.key === "ArrowUp") (e.preventDefault(), moveTo(idx - 1));
+    // 아이콘 보기: ↑↓는 한 줄(열 개수만큼), ←→는 한 칸 — 탐색기와 같다
+    const grid = view === "grid" ? listRef.current?.firstElementChild : null;
+    const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").length : 1;
+    const step = (d: number) => (e.preventDefault(), moveTo(idx < 0 ? 0 : idx + d));
+    if (e.key === "ArrowDown") step(cols);
+    else if (e.key === "ArrowUp") step(-cols);
+    else if (grid && !e.altKey && e.key === "ArrowRight") step(1);
+    else if (grid && !e.altKey && e.key === "ArrowLeft") step(-1);
     else if (e.key === "Home") (e.preventDefault(), moveTo(0));
     else if (e.key === "End") (e.preventDefault(), moveTo(entries.length - 1));
     else if (e.key === "Enter" && focusPath) (e.preventDefault(), open(entries[idx]));
@@ -211,6 +229,25 @@ export function MainScreen() {
     else if (mod && e.shiftKey && e.key.toLowerCase() === "n" && !readOnly) (e.preventDefault(), setCreatingFolder(true));
     else if (mod && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
   }
+
+  // 아이콘 보기 Ctrl+휠: 크기 단계 조절(탐색기처럼). preventDefault가 필요해 passive가 아닌 리스너로 직접 단다
+  const wheelAcc = useRef(0);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || view !== "grid") return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      // 터치패드는 작은 delta가 여러 번 온다. 마우스 한 칸(약 100)만큼 모이면 한 단계
+      wheelAcc.current += e.deltaY;
+      if (Math.abs(wheelAcc.current) < 100) return;
+      const d = wheelAcc.current < 0 ? 1 : -1;
+      wheelAcc.current = 0;
+      setIconSize((s) => Math.max(0, Math.min(ICON_SIZES.length - 1, s + d)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [view, page, setIconSize]);
 
   const listProps = {
     entries,
@@ -268,6 +305,8 @@ export function MainScreen() {
           setView,
           sidebarOpen,
           toggleSidebar: () => setSidebarOpen((v) => !v),
+          detailsOpen,
+          toggleDetails: () => setDetailsOpen((v) => !v),
           refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
           sort,
           setSort,
@@ -296,7 +335,7 @@ export function MainScreen() {
         disabled={!loc.libId || page !== "files"}
       />
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         {sidebarOpen && (
           <>
             <Sidebar
@@ -374,31 +413,25 @@ export function MainScreen() {
               ) : entries.length === 0 && !creatingFolder ? (
                 <Empty text={readOnly ? "비어 있는 폴더입니다" : "비어 있는 폴더입니다. 파일을 끌어다 놓으세요"} />
               ) : view === "grid" ? (
-                <IconGrid {...listProps} />
+                <IconGrid {...listProps} libId={loc.libId} iconSize={iconSize} />
               ) : (
                 <FileList {...listProps} />
               )}
               {marquee.rect && <div className="pointer-events-none absolute border border-primary/60 bg-primary/10" style={marquee.rect} />}
             </BackgroundContextMenu>
           </DropZone>
-          <FileSelectionBar
-            count={selectedEntries.length}
-            hasFile={selectedEntries.some((e) => e.type === "file")}
-            onDownload={() => ops.download.mutate(selectedEntries)}
-            onShare={() => selectedEntries[0] && setSharing(selectedEntries[0])}
-            onRename={() => selectedEntries[0] && setRenamingPath(selectedEntries[0].path)}
-            onDelete={() => setDeleting(selectedEntries)}
-            onClear={() => setSelected(new Set())}
-            readOnly={readOnly}
-          />
             </>
           )}
-          <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
-            <UpdateNotice />
-            <DownloadPanel />
-            <UploadPanel />
-          </div>
         </main>
+        {detailsOpen && page === "files" && (
+          <DetailsPanel libId={loc.libId} libName={lib?.name ?? ""} folderName={crumbs[crumbs.length - 1]?.label ?? ""} entries={dir.data ?? []} selected={selectedEntries} sharedPaths={sharedPaths} />
+        )}
+        {/* 알림(새 버전·다운로드·업로드)은 세부 정보 창이 있어도 창 오른쪽 아래 가장자리에 */}
+        <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
+          <UpdateNotice />
+          <DownloadPanel />
+          <UploadPanel />
+        </div>
       </div>
 
       <StatusBar

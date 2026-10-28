@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { isTauri } from "@/features/shell/platform";
+import { useThumbnailPref } from "./useThumbnailPref";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ function Body() {
   // null = 아직 모름(확인 중이거나 설치된 앱이 아님)
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [thumbs, setThumbs] = useThumbnailPref();
   useEffect(() => {
     if (!isTauri()) return;
     void import("@tauri-apps/plugin-autostart").then((a) => a.isEnabled()).then(setAutostart, () => setAutostart(false));
@@ -51,6 +53,13 @@ function Body() {
       </label>
       {!isTauri() && <p className="text-xs text-muted-foreground">설치된 앱에서만 바꿀 수 있습니다</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
+      <label className="flex items-start gap-2.5">
+        <Checkbox checked={thumbs} onCheckedChange={(v) => setThumbs(!!v)} className="mt-0.5" />
+        <span className="flex flex-col gap-0.5">
+          <span>이미지 썸네일 표시</span>
+          <span className="text-xs text-muted-foreground">아이콘 보기와 세부 정보 창에 적용됩니다. 끄면 파일 아이콘으로 보입니다</span>
+        </span>
+      </label>
     </div>
   );
 }

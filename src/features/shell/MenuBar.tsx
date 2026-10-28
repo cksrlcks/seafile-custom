@@ -25,6 +25,8 @@ export interface MenuActions {
   setView(v: ViewMode): void;
   sidebarOpen: boolean;
   toggleSidebar(): void;
+  detailsOpen: boolean;
+  toggleDetails(): void;
   refresh(): void;
   sort: Sort;
   setSort(s: Sort): void;
@@ -154,6 +156,9 @@ export function MenuBar(a: MenuActions) {
             <MenubarSeparator />
             <MenubarCheckboxItem checked={a.sidebarOpen} onCheckedChange={a.toggleSidebar} className={item}>
               사이드바
+            </MenubarCheckboxItem>
+            <MenubarCheckboxItem checked={a.detailsOpen} onCheckedChange={a.toggleDetails} className={item}>
+              세부 정보 창
             </MenubarCheckboxItem>
             <MenubarItem onClick={a.refresh} className={item}>
               새로고침<MenubarShortcut>F5</MenubarShortcut>

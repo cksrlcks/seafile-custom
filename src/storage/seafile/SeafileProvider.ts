@@ -170,6 +170,9 @@ export class SeafileProvider implements StorageProvider {
     if (!res.ok) throw new StorageError("server", res.statusText, res.status);
     return res.text();
   }
+  thumbnail(libId: string, path: string, size: number, signal?: AbortSignal): Promise<Blob> {
+    return this.api.getBlob(`/api2/repos/${libId}/thumbnail/`, { p: path, size: String(size) }, signal);
+  }
   async mkdir(libId: string, path: string): Promise<void> {
     await this.api.postForm(`/api2/repos/${libId}/dir/`, { operation: "mkdir" }, { p: path });
   }

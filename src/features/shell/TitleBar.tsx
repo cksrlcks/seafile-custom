@@ -1,4 +1,4 @@
-import { IconArrowUp, IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebar, IconList, IconRefresh, IconUpload } from "@tabler/icons-react";
+import { IconArrowUp, IconChevronLeft, IconChevronRight, IconFolderPlus, IconLayoutGrid, IconLayoutSidebarRight, IconList, IconRefresh, IconUpload } from "@tabler/icons-react";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,6 @@ export function TitleBar({ menu: m, crumbs, onNavigate, onSearchPick, disabled }
 
       {/* 2줄: 툴바 */}
       <div {...drag} className="flex h-9 items-center gap-1 px-1.5 pb-1">
-        <IconBtn label="사이드바" onClick={m.toggleSidebar} active={m.sidebarOpen}>
-          <IconLayoutSidebar className="size-4" stroke={1.75} />
-        </IconBtn>
         <IconBtn label="뒤로" shortcut="Alt+←" onClick={m.back} disabled={!m.canBack}>
           <IconChevronLeft className="size-4" stroke={1.75} />
         </IconBtn>
@@ -82,6 +79,9 @@ export function TitleBar({ menu: m, crumbs, onNavigate, onSearchPick, disabled }
             <IconLayoutGrid className="size-3.5" stroke={1.75} />
           </IconBtn>
         </div>
+        <IconBtn label="세부 정보 창" onClick={m.toggleDetails} active={m.detailsOpen}>
+          <IconLayoutSidebarRight className="size-4" stroke={1.75} />
+        </IconBtn>
 
         <IconBtn label="새로고침" shortcut="F5" onClick={m.refresh} disabled={disabled}>
           <IconRefresh className="size-4" stroke={1.75} />

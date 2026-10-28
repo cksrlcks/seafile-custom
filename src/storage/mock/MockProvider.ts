@@ -115,6 +115,13 @@ export class MockProvider implements StorageProvider {
   async readText(_libId: string, path: string): Promise<string> {
     return `# ${baseName(path)}\n\nmock 내용입니다.`;
   }
+  async thumbnail(_libId: string, path: string, size: number): Promise<Blob> {
+    await delay(150);
+    // 경로마다 다른 색의 가로 사진 모양
+    const hue = [...path].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size * 0.75)}"><rect width="100%" height="100%" fill="hsl(${hue} 60% 65%)"/></svg>`;
+    return new Blob([svg], { type: "image/svg+xml" });
+  }
   async mkdir(libId: string, path: string): Promise<void> {
     await delay(150);
     this.ensureDir(libId, path);
