@@ -1,4 +1,5 @@
 pub mod mcp;
+mod localfs;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -245,6 +246,12 @@ fn show_main(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // 이미 떠 있으면 새로 띄우지 않고 기존 창을 앞으로. MCP 중계가 띄운 자동 실행(--autostart)이면 창은 그대로 숨김
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !args.iter().any(|a| a == "--autostart") {
+                show_main(app);
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_upload::init())
@@ -319,7 +326,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::exe_path, localfs::open_claude_config_dir])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {
