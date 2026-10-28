@@ -1,3 +1,4 @@
+import { CloudMark } from "@/components/ui/cloud-mark";
 import { FolderGlyph } from "@/components/ui/folder-glyph";
 import { formatDate, formatSize } from "@/lib/format";
 import { parentPath } from "@/storage/path";
@@ -10,13 +11,15 @@ interface Props {
   libName: string;
   /** 아무것도 선택 안 했을 때 보여 줄 현재 폴더 */
   folderName: string;
+  /** 현재 폴더가 드라이브 맨 위면 폴더 그림에 구름 배지 */
+  root: boolean;
   entries: Entry[];
   selected: Entry[];
   sharedPaths?: Set<string>;
 }
 
 /** 탐색기 "세부 정보 창": 선택 하나면 미리보기+속성, 여럿이면 개수·합계, 없으면 현재 폴더 요약 */
-export function DetailsPanel({ libId, libName, folderName, entries, selected, sharedPaths }: Props) {
+export function DetailsPanel({ libId, libName, folderName, root, entries, selected, sharedPaths }: Props) {
   return (
     <aside className="flex w-70 shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-sidebar p-4 text-sm">
       {selected.length === 1 ? (
@@ -24,7 +27,7 @@ export function DetailsPanel({ libId, libName, folderName, entries, selected, sh
       ) : selected.length > 1 ? (
         <Summary title={`${selected.length}개 항목 선택됨`} items={selected} />
       ) : (
-        <Summary title={folderName} items={entries} />
+        <Summary title={folderName} items={entries} drive={root} />
       )}
     </aside>
   );
@@ -56,13 +59,20 @@ function Single({ libId, libName, entry, shared }: { libId: string | null; libNa
   );
 }
 
-function Summary({ title, items }: { title: string; items: Entry[] }) {
+function Summary({ title, items, drive }: { title: string; items: Entry[]; drive?: boolean }) {
   const dirs = items.filter((e) => e.type === "dir").length;
   const files = items.length - dirs;
   return (
     <>
       <div className="flex h-40 items-center justify-center rounded-lg bg-background">
-        <FolderGlyph className="size-20" />
+        <span className="relative flex">
+          <FolderGlyph className="size-20" />
+          {drive && (
+            <span className="absolute right-0 bottom-2 flex size-8 items-center justify-center rounded-full bg-card shadow-item" aria-label="드라이브">
+              <CloudMark className="size-5" />
+            </span>
+          )}
+        </span>
       </div>
       <div className="font-medium break-all">{title}</div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">

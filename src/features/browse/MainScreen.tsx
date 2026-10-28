@@ -449,7 +449,7 @@ export function MainScreen() {
           )}
         </main>
         {detailsOpen && page === "files" && (
-          <DetailsPanel libId={loc.libId} libName={lib?.name ?? ""} folderName={crumbs[crumbs.length - 1]?.label ?? ""} entries={dir.data ?? []} selected={selectedEntries} sharedPaths={sharedPaths} />
+          <DetailsPanel libId={loc.libId} libName={lib?.name ?? ""} folderName={crumbs[crumbs.length - 1]?.label ?? ""} root={loc.path === "/"} entries={dir.data ?? []} selected={selectedEntries} sharedPaths={sharedPaths} />
         )}
         {loc.libId && page === "files" && (
           <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={closePreview} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate([e])} />
