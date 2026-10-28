@@ -53,6 +53,7 @@ export function Sidebar({ libraries, loc, onNavigate, onRenameLibrary, onStarLib
   for (const l of libraries ?? []) {
     for (const s of l.starred ? ["즐겨찾기", l.section] : [l.section]) sections.set(s, [...(sections.get(s) ?? []), l]);
   }
+  for (const libs of sections.values()) libs.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   // 같은 저장소가 두 섹션에 있으면 선택 표시는 클릭한 쪽에만
   const [clickedIn, setClickedIn] = useState<string | null>(null);
   return (
