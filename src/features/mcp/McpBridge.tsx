@@ -61,6 +61,7 @@ export function McpToolProvider(): null {
       freePath: (dir, name) => invoke<string>("free_path", { dir, name }),
       defaultDownloadDir: async () => getPrefs().downloadDir ?? (await import("@tauri-apps/api/path")).downloadDir(),
       recentFiles: (dir, limit) => invoke<LocalFile[]>("recent_files", { dir, limit }),
+      writeLocalFile: (path, data) => invoke<void>("write_local_file", { path, data: Array.from(data) }),
     };
     return () => {
       currentCtx = null;

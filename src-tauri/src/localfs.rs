@@ -45,6 +45,19 @@ pub async fn read_local_file(path: String) -> Result<tauri::ipc::Response, Strin
     read_capped(Path::new(&path), READ_CAP).map(tauri::ipc::Response::new)
 }
 
+/// 새 파일로만 쓴다. 이미 있으면 거절(사용자 파일을 덮어쓰지 않게)
+fn write_new(path: &Path, data: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    f.write_all(data).map_err(|e| e.to_string())
+}
+
+/// MCP upload_base64: Claude 작업 공간의 파일을 PC 다운로드 폴더에 내려받는다
+#[tauri::command]
+pub async fn write_local_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    write_new(Path::new(&path), &data)
+}
+
 #[tauri::command]
 pub fn recent_files(dir: String, limit: usize) -> Result<Vec<LocalFile>, String> {
     list_recent(Path::new(&dir), limit)
@@ -72,6 +85,15 @@ mod tests {
         let p = temp_dir("ko").join("회의 자료.txt");
         std::fs::write(&p, "안녕").unwrap();
         assert_eq!(read_capped(&p, 10).unwrap(), "안녕".as_bytes());
+    }
+
+    #[test]
+    fn write_new_never_overwrites() {
+        let p = temp_dir("write").join("보고서.docx");
+        write_new(&p, b"hello").unwrap();
+        assert_eq!(std::fs::read(&p).unwrap(), b"hello");
+        assert!(write_new(&p, b"other").is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), b"hello");
     }
 
     #[test]

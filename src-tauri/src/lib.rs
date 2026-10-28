@@ -335,7 +335,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, mcp::mcp_connections, localfs::read_local_file, localfs::recent_files, localfs::exe_path, claude_link::claude_status, claude_link::connect_claude_code, claude_link::connect_claude_desktop, claude_link::claude_desktop_running])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, mcp::mcp_connections, localfs::read_local_file, localfs::recent_files, localfs::write_local_file, localfs::exe_path, claude_link::claude_status, claude_link::connect_claude_code, claude_link::connect_claude_desktop, claude_link::claude_desktop_running])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {

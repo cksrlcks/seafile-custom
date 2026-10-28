@@ -11,7 +11,7 @@ export const INSTRUCTIONS = [
   "응답에 conflicts가 있으면 같은 이름 파일을 덮어쓸지 사용자에게 묻고, 동의할 때만 overwrite: true로 다시 호출한다.",
   "받기(download)는 현재 작업 폴더를 알면(Claude Code) 그 절대 경로를 local_dir로 넘기고, 모르면 생략한다.",
   "사용자가 파일을 이름으로 말하면 search로 찾고, 후보가 여럿이면 어떤 것인지 사용자에게 묻는다.",
-  "올릴 파일이 사용자 PC가 아니라 Claude 작업 공간(채팅에서 만든 docx·pdf·이미지 등)에 있으면, 사용자에게 다운로드를 시키지 말고 직접 올린다. md·txt 같은 텍스트 문서는 upload_text로 올린다. 그 밖의 파일은 작업 공간에서 파일의 base64와 sha256을 구해 upload_base64로 올린다. 파일이 1MB보다 크거나 upload_base64가 계속 실패할 때만, '파일의 다운로드 버튼을 눌러 받아 주세요'라고 요청하고 사용자가 받았다고 하면 recent_downloads로 그 파일을 찾아 upload_file로 올린다.",
+  "올릴 파일이 사용자 PC가 아니라 Claude 작업 공간(채팅에서 만든 docx·pdf·이미지 등)에 있으면, 사용자에게 다운로드를 시키지 말고 직접 PC로 내려받아 올린다. 작업 공간에 사용자 PC 폴더가 연결돼 있으면 그 폴더에 저장하고 그 PC 경로로 upload_file을 쓴다. 연결된 폴더가 없으면 파일의 base64와 sha256을 구해 upload_base64를 쓴다(PC 다운로드 폴더에 저장한 뒤 올린다). md·txt 같은 텍스트 문서는 upload_text로 올려도 된다. 파일이 1MB보다 크거나 계속 실패할 때만 '파일의 다운로드 버튼을 눌러 받아 주세요'라고 요청하고, 사용자가 받았다고 하면 recent_downloads로 찾아 upload_file로 올린다.",
 ].join("\n");
 
 const LOGIN: ToolResult = { content: [{ type: "text", text: "U-Drive 앱에서 로그인해 주세요." }], isError: true };

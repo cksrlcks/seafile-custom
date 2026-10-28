@@ -15,6 +15,7 @@ function makeCtx(over: Partial<ToolCtx> = {}): ToolCtx {
     freePath: async (d, n) => `${d}/${n}`,
     defaultDownloadDir: async () => "C:/Downloads",
     recentFiles: async () => [],
+    writeLocalFile: async () => {},
     ...over,
   };
 }
@@ -64,25 +65,33 @@ describe("callTool", () => {
     SLOW,
   );
 
+  // "hello"
+  const HELLO = { base64: "aGVs\nbG8=", sha256: "2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824" };
+
   it(
-    "upload_base64 uploads the decoded bytes when sha256 matches",
+    "upload_base64 saves to the download folder first, then uploads",
     async () => {
-      const ctx = makeCtx();
-      // "hello"
-      const args = { name: "보고서.docx", base64: "aGVs\nbG8=", sha256: "2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824", library: "docs", dir: "/보고" };
-      const r = parse(await callTool("upload_base64", args, ctx));
+      const saved: [string, number][] = [];
+      const ctx = makeCtx({ writeLocalFile: async (p, d) => void saved.push([p, d.length]) });
+      const r = parse(await callTool("upload_base64", { name: "보고서.docx", ...HELLO, library: "docs", dir: "/보고" }, ctx));
+      expect(saved).toEqual([["C:/Downloads/보고서.docx", 5]]);
+      expect(r.savedTo).toBe("C:/Downloads/보고서.docx");
       expect(r.uploaded).toEqual([{ name: "보고서.docx", path: "/보고/보고서.docx" }]);
       expect((await ctx.storage.listDir("docs", "/보고")).map((e) => [e.name, e.size])).toEqual([["보고서.docx", 5]]);
     },
     SLOW,
   );
 
-  it("upload_base64 refuses when sha256 does not match", async () => {
-    const ctx = makeCtx();
-    const r = await callTool("upload_base64", { name: "a.docx", base64: "aGVsbG8=", sha256: "00", library: "docs", dir: "/보고" }, ctx);
-    expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain("sha256");
+  it("upload_base64 saves nothing when sha256 does not match or the name conflicts", async () => {
+    const saved: string[] = [];
+    const ctx = makeCtx({ writeLocalFile: async (p) => void saved.push(p) });
+    const bad = await callTool("upload_base64", { name: "a.docx", base64: HELLO.base64, sha256: "00", library: "docs", dir: "/보고" }, ctx);
+    expect(bad.isError).toBe(true);
+    expect(bad.content[0].text).toContain("sha256");
     expect((await ctx.storage.listDir("docs", "/")).some((e) => e.name === "보고")).toBe(false);
+    const conflict = parse(await callTool("upload_base64", { name: "README.md", ...HELLO, library: "docs", dir: "/" }, ctx));
+    expect(conflict).toMatchObject({ uploaded: [], conflicts: ["README.md"] });
+    expect(saved).toEqual([]);
   });
 
   it("upload_file stops entirely on any conflict", async () => {

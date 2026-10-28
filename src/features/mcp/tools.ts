@@ -26,6 +26,8 @@ export interface ToolCtx {
   /** 설정의 다운로드 폴더, 없으면 OS 다운로드 폴더 */
   defaultDownloadDir(): Promise<string>;
   recentFiles(dir: string, limit: number): Promise<LocalFile[]>;
+  /** 새 파일로 쓴다(있는 파일은 덮어쓰지 않는다) */
+  writeLocalFile(path: string, data: Uint8Array): Promise<void>;
 }
 
 export interface ToolResult {
@@ -39,7 +41,8 @@ const LIBRARY = str("저장소 id (list_libraries의 id)");
 export const TOOLS: { name: string; description: string; inputSchema: object }[] = [
   {
     name: "list_libraries",
-    description: "드라이브의 저장소 목록. section이 '내 저장소'인 것이 사용자 본인 저장소다. 암호화·읽기 전용 여부도 알려준다.",
+    description:
+      "U-Drive(유드라이브·udrive·회사 드라이브)의 저장소 목록. U-Drive는 사용자 PC의 U-Drive 앱에 로그인된 드라이브로, 구글 드라이브가 아니다. 사용자가 U-Drive·유드라이브·회사 드라이브라고 하면 이 도구들을 쓰고, 그냥 '드라이브'라고만 했는데 다른 드라이브 도구도 있으면 어느 쪽인지 먼저 묻는다. section이 '내 저장소'인 것이 사용자 본인 저장소다. 암호화·읽기 전용 여부도 알려준다.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -55,7 +58,7 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   {
     name: "upload_file",
     description:
-      "사용자 PC의 파일을 드라이브 폴더에 올린다. 폴더가 없으면 만든다. 같은 이름이 있으면 아무것도 올리지 않고 conflicts를 돌려준다. 반드시 사용자 확인을 받은 뒤 호출한다.",
+      "사용자 PC의 파일을 U-Drive 폴더에 올린다. 사용자가 올려 달라고 할 때만 쓴다(문서를 다 썼다고 먼저 묻지 않는다). 올리기 전에 list_libraries·list_dir로 '내 저장소'의 폴더 구조를 보고 올릴 폴더를 제안해 사용자 확인을 받는다. 폴더가 없으면 만든다. 같은 이름이 있으면 아무것도 올리지 않고 conflicts를 돌려준다. 그러면 덮어쓸지 묻고 동의할 때만 overwrite: true로 다시 호출한다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -69,7 +72,7 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   },
   {
     name: "upload_text",
-    description: "텍스트 내용을 UTF-8 파일로 만들어 드라이브 폴더에 올린다(채팅에서 쓴 md·txt 문서용). 규칙은 upload_file과 같다.",
+    description: "텍스트 내용을 UTF-8 파일로 만들어 U-Drive 폴더에 올린다(채팅에서 쓴 md·txt 문서용). 규칙은 upload_file과 같다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -85,7 +88,7 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   {
     name: "upload_base64",
     description:
-      "Claude 작업 공간에 있는 파일(채팅에서 만든 docx·pdf·이미지 등)을 base64로 받아 드라이브 폴더에 올린다. 작업 공간에서 파일의 base64와 sha256을 구해 그대로 넘긴다. sha256이 맞지 않으면 올리지 않는다. 규칙은 upload_file과 같다.",
+      "Claude 작업 공간(클라우드)에 있는 파일(채팅에서 만든 docx·pdf·이미지 등)을 사용자 PC의 다운로드 폴더에 내려받은 뒤 U-Drive 폴더에 올린다. 사용자가 작업 공간의 파일을 U-Drive(유드라이브)에 올려 달라고 하면 사용자에게 다운로드를 부탁하지 말고 이 도구를 쓴다. 작업 공간에서 파일의 base64와 sha256을 구해 그대로 넘긴다. sha256이 맞지 않으면 아무것도 하지 않는다. 작업 공간에 사용자 PC 폴더가 연결돼 있으면 이 도구 대신 그 폴더에 저장하고 upload_file로 올려도 된다. 반드시 사용자 확인을 받은 뒤 호출한다.",
     inputSchema: {
       type: "object",
       properties: {
@@ -169,7 +172,7 @@ async function findLibrary(ctx: ToolCtx, id: string, use: "upload" | "download")
 }
 
 /** 충돌을 먼저 보고(하나라도 있으면 전부 멈춤) 파일은 그다음에 읽는다. 업로드 큐에 넣어 앱 패널에도 뜬다 */
-async function upload(ctx: ToolCtx, libId: string, dir: string, names: string[], load: () => Promise<File[]>, overwrite: boolean): Promise<ToolResult> {
+async function upload(ctx: ToolCtx, libId: string, dir: string, names: string[], load: () => Promise<File[]>, overwrite: boolean, extra: () => object = () => ({})): Promise<ToolResult> {
   await findLibrary(ctx, libId, "upload");
   const { targetDir, relativePath, existing } = await resolveTarget(ctx.storage, libId, dir);
   const taken = new Set(existing.map((e) => e.name));
@@ -184,6 +187,7 @@ async function upload(ctx: ToolCtx, libId: string, dir: string, names: string[],
   return json({
     uploaded: items.filter((i) => i.status === "done").map((i) => ({ name: i.task.file.name, path: joinPath(dirPath, i.task.file.name) })),
     failed: items.filter((i) => i.status !== "done").map((i) => ({ name: i.task.file.name, error: i.error ?? "취소됨" })),
+    ...extra(),
   });
 }
 
@@ -248,7 +252,14 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
       const bytes = decodeBase64(arg(args, "base64", isStr));
       const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
       if (hash !== arg<string>(args, "sha256", isStr).trim().toLowerCase()) throw new Error("sha256이 맞지 않아 올리지 않았습니다. base64를 다시 구해 시도하세요.");
-      return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), [fileName], async () => [new File([bytes], fileName)], args.overwrite === true);
+      // 사용자가 직접 받은 것처럼 먼저 PC 다운로드 폴더에 저장하고, 그 파일을 올린다(충돌이 있으면 저장도 하지 않는다)
+      let savedTo: string | undefined;
+      const save = async () => {
+        savedTo = await ctx.freePath(await ctx.defaultDownloadDir(), fileName);
+        await ctx.writeLocalFile(savedTo, bytes);
+        return [new File([bytes], fileName)];
+      };
+      return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), [fileName], save, args.overwrite === true, () => ({ savedTo }));
     }
     case "download":
       return download(ctx, arg(args, "library", isStr), arg(args, "paths", isStrs), isStr(args.local_dir) ? (args.local_dir as string) : undefined);
