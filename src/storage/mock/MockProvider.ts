@@ -23,7 +23,7 @@ export class MockProvider implements StorageProvider {
     this.set("docs", "/", [
       dir("/회의록", now), dir("/프로젝트", now - 86400), dir("/영수증", now - 400000),
       file("/README.md", 1_024, now), file("/예산.xlsx", 48_000, now - 7200), file("/로고.png", 320_000, now - 86400 * 3),
-      file("/계약서.pdf", 2_300_000, now - 86400 * 9),
+      file("/계약서.pdf", 2_300_000, now - 86400 * 9), file("/소개.html", 2_048, now - 3600),
     ]);
     this.set("docs", "/회의록", [file("/회의록/2026-10-20.md", 4_000, now), file("/회의록/2026-10-13.md", 3_500, now - 600000)]);
     this.set("docs", "/프로젝트", []);
@@ -120,7 +120,50 @@ export class MockProvider implements StorageProvider {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
   async readText(_libId: string, path: string): Promise<string> {
-    return `# ${baseName(path)}\n\nmock 내용입니다.`;
+    // HTML 미리보기 확인용: 스타일·링크와 함께, 막혀야 하는 스크립트·폼을 넣어 둔다
+    if (/\.html?$/i.test(path))
+      return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui;margin:40px;color:#222}h1{color:#0a63c9}.card{border:1px solid #ddd;border-radius:8px;padding:16px}</style></head>
+<body><h1>${baseName(path)}</h1><div class="card"><p>HTML 미리보기 견본입니다. <a href="https://example.com">외부 링크</a></p>
+<form action="https://example.com"><input name="q" placeholder="폼(전송 막힘)"><button>보내기</button></form></div>
+<p id="js">스크립트가 막히면 이 문장이 그대로 보입니다.</p><script>document.getElementById("js").textContent = "스크립트가 실행됨!";</script></body></html>`;
+    if (!/\.(md|markdown)$/i.test(path)) return `# ${baseName(path)}\n\nmock 내용입니다.`;
+    // 마크다운 미리보기 확인용: 제목·목록·표·체크리스트·코드·인용·링크
+    return [
+      `# ${baseName(path)}`,
+      "",
+      "팀 공용 드라이브 사용 안내입니다. **굵게**, *기울임*, ~~취소선~~, `인라인 코드`를 씁니다.",
+      "",
+      "## 폴더 규칙",
+      "",
+      "1. 프로젝트마다 폴더를 하나 만든다",
+      "2. 회의록은 `회의록/날짜.md` 로 저장한다",
+      "   - 날짜는 `YYYY-MM-DD`",
+      "   - 참석자를 맨 위에 적는다",
+      "",
+      "## 할 일",
+      "",
+      "- [x] 드라이브 정리",
+      "- [ ] 공유 링크 만료일 확인",
+      "- [ ] 휴지통 비우기",
+      "",
+      "## 용량",
+      "",
+      "| 저장소 | 사용량 | 비고 |",
+      "| --- | ---: | --- |",
+      "| 문서 | 1.2 MB | 공용 |",
+      "| 사진 | 9.8 GB | 개인 |",
+      "",
+      "> 큰 파일은 끌어다 놓으면 나눠서 올라갑니다.",
+      "",
+      "```ts",
+      "const total = files.reduce((a, f) => a + f.size, 0);",
+      "console.log(formatSize(total));",
+      "```",
+      "",
+      "---",
+      "",
+      "마크다운 문법은 [Markdown Guide](https://www.markdownguide.org/)를 참고하세요.",
+    ].join("\n");
   }
   async thumbnail(_libId: string, path: string, size: number): Promise<Blob> {
     await delay(150);

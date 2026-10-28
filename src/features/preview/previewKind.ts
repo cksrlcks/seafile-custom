@@ -2,7 +2,7 @@ export type PreviewKind = "image" | "text" | "pdf";
 
 const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"]);
 const TEXT = new Set([
-  "txt", "md", "markdown", "json", "js", "ts", "tsx", "jsx", "css", "html", "xml", "yml", "yaml", "toml", "ini", "log", "sh", "py", "rs", "go", "java", "c", "cpp", "h",
+  "txt", "md", "markdown", "json", "js", "ts", "tsx", "jsx", "css", "html", "htm", "xml", "yml", "yaml", "toml", "ini", "log", "sh", "py", "rs", "go", "java", "c", "cpp", "h",
 ]);
 
 export function previewKind(name: string): PreviewKind | null {

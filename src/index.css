@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "pretendard/dist/web/variable/pretendardvariable.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 /* 맥 전용 보정(mac:…). data-os는 main.tsx에서 붙인다 */
@@ -237,4 +238,54 @@
   input, textarea {
     letter-spacing: -0.005em;
   }
+}
+
+/* 마크다운 미리보기(prose). 색은 디자인 토큰에 묶어 밝은·어두운 테마를 그대로 따른다 */
+.prose-markdown {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted-foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--muted-foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--muted-foreground);
+  --tw-prose-kbd: var(--foreground);
+  --tw-prose-kbd-shadows: var(--border);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--muted);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+/* 인라인 코드: 백틱 표시 대신 옅은 배경(GitHub처럼) */
+.prose-markdown :where(code)::before,
+.prose-markdown :where(code)::after {
+  content: none;
+}
+.prose-markdown :where(:not(pre) > code) {
+  border-radius: 4px;
+  background: var(--muted);
+  padding: 0.15em 0.4em;
+  font-weight: 500;
+}
+.prose-markdown :where(blockquote) {
+  font-style: normal;
+  font-weight: 400;
+}
+.prose-markdown :where(blockquote p)::before,
+.prose-markdown :where(blockquote p)::after {
+  content: none;
+}
+/* GFM 체크리스트: 글머리표 대신 체크 상자 */
+.prose-markdown :where(.contains-task-list) {
+  list-style: none;
+  padding-left: 0;
+}
+.prose-markdown :where(.task-list-item input) {
+  margin: 0 0.5em 0 0;
+  vertical-align: middle;
 }

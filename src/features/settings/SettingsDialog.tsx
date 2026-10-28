@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { isTauri } from "@/features/shell/platform";
+import { isTauri, openExternal } from "@/features/shell/platform";
 import { formatSize } from "@/lib/format";
 import { useSession, useStorage } from "@/storage/StorageContext";
 import { useThumbnailPref } from "./useThumbnailPref";
@@ -97,11 +97,6 @@ function Row({ title, desc, children }: { title: string; desc?: ReactNode; child
 
 const Pill = ({ children, className }: { children: ReactNode; className?: string }) => <span className={cn("max-w-[60%] truncate rounded-full bg-muted px-2 py-1 text-xs font-semibold", className)}>{children}</span>;
 const btn = "h-8 shrink-0 rounded-[10px] border bg-card px-3 text-sm outline-none focus-visible:ring-2";
-
-function openExternal(url: string) {
-  if (isTauri()) void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url));
-  else window.open(url, "_blank");
-}
 
 function AccountPage() {
   const storage = useStorage();

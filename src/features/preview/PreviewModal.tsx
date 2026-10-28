@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { IconChevronLeft, IconChevronRight, IconDownload, IconInfoCircle, IconRotateClockwise, IconX, IconZoomIn, IconZoomOut } from "@tabler/icons-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { EntryIcon } from "@/features/browse/FileList";
@@ -15,6 +15,12 @@ import { previewKind } from "./previewKind";
 
 const TEXT_LIMIT = 1024 * 1024;
 const STEP = 1.25;
+// 마크다운 렌더러는 미리보기를 열 때만 받는다
+const MarkdownView = lazy(() => import("./MarkdownView"));
+const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
+const isHtml = (name: string) => /\.html?$/i.test(name);
+/** 원문 말고 그려서 보여 줄 수 있는 텍스트 */
+const isRendered = (name: string) => isMarkdown(name) || isHtml(name);
 
 interface Props {
   libId: string;
@@ -39,6 +45,8 @@ export function PreviewModal({ libId, entries, index, onClose, onNavigate, onDow
   const [img, setImg] = useState<Size | null>(null);
   const [stage, setStage] = useState<Size>({ w: 1, h: 1 });
   const [info, setInfo] = useStoredState("seadrive.viewer.info", false);
+  /** 마크다운·HTML을 원문으로 볼지. 기본은 그려서 보기 */
+  const [source, setSource] = useStoredState("seadrive.viewer.source", false);
   useEffect(() => {
     setView(FIT);
     setImg(null);
@@ -96,6 +104,24 @@ export function PreviewModal({ libId, entries, index, onClose, onNavigate, onDow
             <span className="mx-1.5 h-4 w-px bg-border" />
           </>
         )}
+        {isRendered(entry.name) && (
+          <>
+            <div className="flex h-7 items-center rounded-md border border-border p-0.5">
+              {([false, true] as const).map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  aria-pressed={source === v}
+                  onClick={() => setSource(v)}
+                  className={cn("h-full rounded-sm px-2.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50", source === v ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  {v ? "원문" : "미리보기"}
+                </button>
+              ))}
+            </div>
+            <span className="mx-1.5 h-4 w-px bg-border" />
+          </>
+        )}
         <Button variant="ghost" size="icon-sm" aria-pressed={info} className={cn(info && "bg-muted")} onClick={() => setInfo((v) => !v)} title="정보 (I)">
           <IconInfoCircle className="size-4" />
         </Button>
@@ -112,7 +138,7 @@ export function PreviewModal({ libId, entries, index, onClose, onNavigate, onDow
             {isImage ? (
               <ImageView key={entry.path} libId={libId} entry={entry} view={view} scale={scale} loaded={!!img} onLoad={setImg} onPan={setView} onZoom={zoomTo} onDoubleClick={toggleFit} />
             ) : (
-              <Body key={entry.path} libId={libId} entry={entry} onDownload={onDownload} />
+              <Body key={entry.path} libId={libId} entry={entry} source={source} onDownload={onDownload} />
             )}
           </Stage>
           {index > 0 && <NavButton side="left" onClick={() => onNavigate(index - 1)} />}
@@ -285,7 +311,7 @@ function InfoPanel({ entry, img }: { entry: Entry; img: Size | null }) {
   );
 }
 
-function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDownload(entry: Entry): void }) {
+function Body({ libId, entry, source, onDownload }: { libId: string; entry: Entry; source: boolean; onDownload(entry: Entry): void }) {
   const storage = useStorage();
   const kind = previewKind(entry.name);
   const tooBig = kind === "text" && entry.size > TEXT_LIMIT;
@@ -330,10 +356,16 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
   if (url.error || text.error || pdfError) return <Fallback message="불러오지 못했습니다" />;
   if (kind === "pdf") return pdfUrl ? <iframe src={pdfUrl} title={entry.name} className="h-full w-full bg-card" /> : <Loading />;
   if (kind === "text")
-    return text.data !== undefined ? (
-      <pre className="h-full w-full overflow-auto bg-card p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap">{text.data}</pre>
-    ) : (
+    return text.data === undefined ? (
       <Loading />
+    ) : isMarkdown(entry.name) && !source ? (
+      <Suspense fallback={<Loading />}>
+        <MarkdownView text={text.data} />
+      </Suspense>
+    ) : isHtml(entry.name) && !source ? (
+      <HtmlView html={text.data} title={entry.name} />
+    ) : (
+      <pre className="h-full w-full overflow-auto bg-card p-6 font-mono text-sm leading-relaxed whitespace-pre-wrap">{text.data}</pre>
     );
   return (
     <Fallback message="미리보기를 지원하지 않는 형식입니다">
@@ -342,6 +374,23 @@ function Body({ libId, entry, onDownload }: { libId: string; entry: Entry; onDow
       </Button>
     </Fallback>
   );
+}
+
+/**
+ * HTML은 모양만 그린다. sandbox=""라 스크립트·폼 전송·팝업·상위 창 이동이 모두 막히고 출처도 앱과 분리된다
+ * (서버에서 받은 파일의 스크립트가 앱 웹뷰에서 돌면 안 된다). 링크는 <base target="_blank">로 새 창에 보내
+ * (팝업이 막혀 있어 아무 일도 없다) iframe이 다른 사이트로 넘어가 버리지 않게 한다
+ */
+function HtmlView({ html, title }: { html: string; title: string }) {
+  const doc = useMemo(() => {
+    const d = new DOMParser().parseFromString(html, "text/html"); // 파싱만 하고 스크립트는 돌리지 않는다
+    const base = d.createElement("base");
+    base.target = "_blank";
+    d.head.prepend(base);
+    return (d.doctype ? "<!doctype html>" : "") + d.documentElement.outerHTML;
+  }, [html]);
+  // 바탕색이 없는 문서가 많아 흰 바탕을 깐다(뷰어는 어두운 테마)
+  return <iframe sandbox="" srcDoc={doc} title={title} className="h-full w-full bg-white" />;
 }
 
 function Loading() {
