@@ -177,7 +177,7 @@ Claude의 행동은 이 안내문과 도구 설명으로 유도한다. 담을 �
 ## 진행 상태 (2026-10-28)
 
 - 설계 대화와 검토자 확인을 마쳤고, 사용자가 승인했다.
-- 다음 단계: 구현 계획서 작성(`docs/superpowers/plans/`). 계획의 첫 작업은 Windows 릴리스 빌드에서 GUI 앱의 stdio 동작을 검증하는 것이다.
+- 구현 계획서: `docs/superpowers/plans/2026-10-28-drive-mcp.md`. Windows GUI 서브시스템의 stdio 검증은 처음으로 끝까지 연결되는 Task 6에서 한다.
 
 ## 결정 출처
 
