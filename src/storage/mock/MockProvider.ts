@@ -125,7 +125,7 @@ export class MockProvider implements StorageProvider {
       return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui;margin:40px;color:#222}h1{color:#0a63c9}.card{border:1px solid #ddd;border-radius:8px;padding:16px}</style></head>
 <body><h1>${baseName(path)}</h1><div class="card"><p>HTML 미리보기 견본입니다. <a href="https://example.com">외부 링크</a></p>
 <form action="https://example.com"><input name="q" placeholder="폼(전송 막힘)"><button>보내기</button></form></div>
-<p id="js">스크립트가 막히면 이 문장이 그대로 보입니다.</p><script>document.getElementById("js").textContent = "스크립트가 실행됨!";</script></body></html>`;
+<p id="js">스크립트가 막히면 이 문장이 그대로 보입니다.</p><img src="https://example.com/pixel.png" alt="외부 이미지(차단)"><script>document.getElementById("js").textContent = "스크립트가 실행됨!";</script></body></html>`;
     if (!/\.(md|markdown)$/i.test(path)) return `# ${baseName(path)}\n\nmock 내용입니다.`;
     // 마크다운 미리보기 확인용: 제목·목록·표·체크리스트·코드·인용·링크
     return [

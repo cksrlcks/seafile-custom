@@ -18,8 +18,9 @@ const components: Components = {
       {children}
     </a>
   ),
-  // 상대 경로 이미지는 서버 파일이라 앱 주소로는 못 불러온다. 깨진 그림 대신 대체 글만
-  img: ({ src, alt }) => (typeof src === "string" && /^(https?:|data:)/i.test(src) ? <img src={src} alt={alt ?? ""} /> : alt ? <span className="text-muted-foreground">[{alt}]</span> : null),
+  // 문서에 박힌 data: 이미지만 그린다. 외부 이미지는 추적용일 수 있어 불러오지 않고(HTML 미리보기의 CSP와 같은 기준),
+  // 상대 경로는 서버 파일이라 앱 주소로는 못 불러온다. 둘 다 대체 글만
+  img: ({ src, alt }) => (typeof src === "string" && /^data:image\//i.test(src) ? <img src={src} alt={alt ?? ""} /> : alt ? <span className="text-muted-foreground">[{alt}]</span> : null),
 };
 
 /**

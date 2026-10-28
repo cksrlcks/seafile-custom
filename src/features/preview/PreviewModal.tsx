@@ -379,14 +379,19 @@ function Body({ libId, entry, source, onDownload }: { libId: string; entry: Entr
 /**
  * HTML은 모양만 그린다. sandbox=""라 스크립트·폼 전송·팝업·상위 창 이동이 모두 막히고 출처도 앱과 분리된다
  * (서버에서 받은 파일의 스크립트가 앱 웹뷰에서 돌면 안 된다). 링크는 <base target="_blank">로 새 창에 보내
- * (팝업이 막혀 있어 아무 일도 없다) iframe이 다른 사이트로 넘어가 버리지 않게 한다
+ * (팝업이 막혀 있어 아무 일도 없다) iframe이 다른 사이트로 넘어가 버리지 않게 한다.
+ * CSP로 외부 요청(이미지·CSS·글꼴 등)도 막는다 — 추적용 이미지로 열람 사실이 새지 않게. 문서 안에 넣은 스타일·data: 이미지만 쓴다.
+ * 문서가 자기 CSP를 따로 넣어도 정책은 겹쳐 적용돼(모두 통과해야 함) 풀리지 않는다
  */
 function HtmlView({ html, title }: { html: string; title: string }) {
   const doc = useMemo(() => {
     const d = new DOMParser().parseFromString(html, "text/html"); // 파싱만 하고 스크립트는 돌리지 않는다
     const base = d.createElement("base");
     base.target = "_blank";
-    d.head.prepend(base);
+    const csp = d.createElement("meta");
+    csp.httpEquiv = "Content-Security-Policy";
+    csp.content = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'";
+    d.head.prepend(csp, base);
     return (d.doctype ? "<!doctype html>" : "") + d.documentElement.outerHTML;
   }, [html]);
   // 바탕색이 없는 문서가 많아 흰 바탕을 깐다(뷰어는 어두운 테마)
