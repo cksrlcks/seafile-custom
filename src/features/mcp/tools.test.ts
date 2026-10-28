@@ -47,9 +47,11 @@ describe("resolveTarget", () => {
 });
 
 describe("callTool", () => {
-  it("list_libraries returns ids, sections and flags", async () => {
-    const libs = parse(await callTool("list_libraries", {}, makeCtx()));
-    expect(libs).toContainEqual({ id: "family", name: "집-공유", section: "나에게 공유됨", readOnly: true, encrypted: false });
+  it("list_libraries returns only my libraries unless scope is all", async () => {
+    const mine = parse(await callTool("list_libraries", {}, makeCtx()));
+    expect(mine.map((l: { id: string }) => l.id)).toEqual(["docs", "photos", "vault"]);
+    const all = parse(await callTool("list_libraries", { scope: "all" }, makeCtx()));
+    expect(all).toContainEqual({ id: "family", name: "집-공유", section: "나에게 공유됨", readOnly: true, encrypted: false });
   });
 
   it("list_dir lists entries with readable size and date", async () => {
@@ -167,6 +169,16 @@ describe("callTool", () => {
     const r = parse(await callTool("search", { query: "2026-10" }, makeCtx({ searchIndex: () => ({ entries, loading: true }) })));
     expect(r.results).toEqual([{ library: "docs", libraryName: "문서", path: "/회의록/2026-10-20.md", type: "file", size: "3.9 KB" }]);
     expect(r.note).toBe("색인 중이라 결과가 일부일 수 있습니다");
+  });
+
+  it("search skips shared libraries unless scope is all", async () => {
+    const entries = [{ id: "1", name: "공유문서.md", type: "file" as const, size: 1, mtime: 0, path: "/공유문서.md", libId: "family" }];
+    const ctx = makeCtx({ searchIndex: () => ({ entries, loading: false }) });
+    const mine = parse(await callTool("search", { query: "공유" }, ctx));
+    expect(mine.results).toEqual([]);
+    expect(mine.note).toContain("scope: all");
+    const all = parse(await callTool("search", { query: "공유", scope: "all" }, ctx));
+    expect(all.results.map((x: { libraryName: string }) => x.libraryName)).toEqual(["집-공유"]);
   });
 
   it("recent_downloads reads the default download dir", async () => {

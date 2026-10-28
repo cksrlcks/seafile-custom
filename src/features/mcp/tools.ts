@@ -42,13 +42,19 @@ export interface ToolResult {
 const str = (description: string) => ({ type: "string", description });
 const LIBRARY = str("저장소 id (list_libraries의 id)");
 const MY_LIBRARY = str("저장소 id. 생략하면 '내 저장소'의 저장소(하나뿐일 때). 여럿이면 후보를 알려준다");
+const MINE = "내 저장소";
+const SCOPE = {
+  type: "string",
+  enum: ["mine", "all"],
+  description: "mine(기본) = 사용자 본인 저장소('내 저장소')만. all = 다른 사람이 공유한 저장소까지. 사용자가 공유받은 것·팀·다른 사람 것을 말할 때만 all",
+};
 
 export const TOOLS: { name: string; description: string; inputSchema: object }[] = [
   {
     name: "list_libraries",
     description:
-      "U-Drive(유드라이브·udrive·회사 드라이브)의 저장소 목록. U-Drive는 사용자 PC의 U-Drive 앱에 로그인된 드라이브로, 구글 드라이브가 아니다. 사용자가 U-Drive·유드라이브·회사 드라이브라고 하면 이 도구들을 쓰고, 그냥 '드라이브'라고만 했는데 다른 드라이브 도구도 있으면 어느 쪽인지 먼저 묻는다. section이 '내 저장소'인 것이 사용자 본인 저장소다. 암호화·읽기 전용 여부도 알려준다.",
-    inputSchema: { type: "object", properties: {} },
+      "U-Drive(유드라이브·udrive·회사 드라이브)의 저장소 목록. U-Drive는 사용자 PC의 U-Drive 앱에 로그인된 드라이브로, 구글 드라이브가 아니다. 사용자가 U-Drive·유드라이브·회사 드라이브라고 하면 이 도구들을 쓰고, 그냥 '드라이브'라고만 했는데 다른 드라이브 도구도 있으면 어느 쪽인지 먼저 묻는다. 기본은 사용자 본인 저장소('내 저장소')만 돌려준다. '내 드라이브'·'내 유드라이브'는 본인 저장소만 뜻하므로 공유받은 저장소는 보지 않는다. 암호화·읽기 전용 여부도 알려준다.",
+    inputSchema: { type: "object", properties: { scope: SCOPE } },
   },
   {
     name: "list_dir",
@@ -67,8 +73,8 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   },
   {
     name: "search",
-    description: "모든 저장소에서 이름으로 파일·폴더를 찾는다(최대 20개).",
-    inputSchema: { type: "object", properties: { query: str("찾을 이름(일부)") }, required: ["query"] },
+    description: "이름으로 파일·폴더를 찾는다(최대 20개). 기본은 사용자 본인 저장소('내 저장소')에서만 찾는다.",
+    inputSchema: { type: "object", properties: { query: str("찾을 이름(일부)"), scope: SCOPE }, required: ["query"] },
   },
   {
     name: "upload_file",
@@ -179,9 +185,15 @@ function decodeBase64(b64: string): Uint8Array<ArrayBuffer> {
 }
 const isStrs = (v: unknown) => Array.isArray(v) && v.length > 0 && v.every(isStr);
 
+/** scope가 all이 아니면 사용자 본인 저장소만. '내 유드라이브'에 공유받은 저장소가 섞이지 않게 한다 */
+async function scopedLibraries(ctx: ToolCtx, args: Record<string, unknown>): Promise<Library[]> {
+  const libs = await ctx.storage.listLibraries();
+  return args.scope === "all" ? libs : libs.filter((l) => l.section === MINE);
+}
+
 /** library를 생략했을 때: '내 저장소'의 저장소가 하나면 그것, 아니면 후보를 담아 실패한다 */
 async function myLibraryId(ctx: ToolCtx): Promise<string> {
-  const mine = (await ctx.storage.listLibraries()).filter((l) => l.section === "내 저장소" && !l.encrypted);
+  const mine = (await ctx.storage.listLibraries()).filter((l) => l.section === MINE && !l.encrypted);
   if (mine.length === 1) return mine[0].id;
   throw new Error(`library를 지정하세요. 내 저장소: ${JSON.stringify(mine.map((l) => ({ id: l.id, name: l.name })))}`);
 }
@@ -274,7 +286,7 @@ export async function callTool(name: string, args: Record<string, unknown>, ctx:
 async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): Promise<ToolResult> {
   switch (name) {
     case "list_libraries":
-      return json((await ctx.storage.listLibraries()).map((l) => ({ id: l.id, name: l.name, section: l.section, readOnly: !!l.readOnly, encrypted: l.encrypted })));
+      return json((await scopedLibraries(ctx, args)).map((l) => ({ id: l.id, name: l.name, section: l.section, readOnly: !!l.readOnly, encrypted: l.encrypted })));
     case "list_dir": {
       const libId = isStr(args.library) ? (args.library as string) : await myLibraryId(ctx);
       const entries = await ctx.storage.listDir(libId, normalizeDir(arg(args, "path", isStr)));
@@ -285,9 +297,14 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
       return preview(ctx, isStr(args.library) ? (args.library as string) : await myLibraryId(ctx), arg(args, "path", isStr));
     case "search": {
       const { entries, loading } = ctx.searchIndex();
-      const libNames = new Map((await ctx.storage.listLibraries()).map((l) => [l.id, l.name]));
-      const results = searchEntries(entries, arg(args, "query", isStr), 20).map((e) => ({ library: e.libId, libraryName: libNames.get(e.libId) ?? e.libId, path: e.path, type: e.type, size: formatSize(e.size) }));
-      return json(loading ? { results, note: "색인 중이라 결과가 일부일 수 있습니다" } : { results });
+      const libNames = new Map((await scopedLibraries(ctx, args)).map((l) => [l.id, l.name]));
+      const results = searchEntries(entries.filter((e) => libNames.has(e.libId)), arg(args, "query", isStr), 20).map((e) => ({ library: e.libId, libraryName: libNames.get(e.libId) ?? e.libId, path: e.path, type: e.type, size: formatSize(e.size) }));
+      const note = loading
+        ? "색인 중이라 결과가 일부일 수 있습니다"
+        : !results.length && args.scope !== "all"
+          ? "내 저장소에는 없습니다. 공유받은 저장소까지 찾을지 사용자에게 물어본 뒤 scope: all로 다시 찾으세요."
+          : undefined;
+      return json({ results, note });
     }
     case "upload_file": {
       const paths = arg<string[]>(args, "local_paths", isStrs);
