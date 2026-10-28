@@ -83,6 +83,23 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
     },
   },
   {
+    name: "upload_base64",
+    description:
+      "Claude 작업 공간에 있는 파일(채팅에서 만든 docx·pdf·이미지 등)을 base64로 받아 드라이브 폴더에 올린다. 작업 공간에서 파일의 base64와 sha256을 구해 그대로 넘긴다. sha256이 맞지 않으면 올리지 않는다. 규칙은 upload_file과 같다.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: str("파일 이름(확장자 포함)"),
+        base64: str("파일 내용의 base64"),
+        sha256: str("원본 파일의 sha256(16진수). 옮기다 깨지지 않았는지 확인한다"),
+        library: LIBRARY,
+        dir: str("올릴 폴더 경로('/'로 시작)"),
+        overwrite: { type: "boolean", description: "같은 이름 파일을 덮어쓴다. 사용자가 동의했을 때만 true" },
+      },
+      required: ["name", "base64", "sha256", "library", "dir"],
+    },
+  },
+  {
     name: "download",
     description: "드라이브 파일을 사용자 PC에 받는다(폴더는 안 됨). 같은 이름이 있으면 번호를 붙여 저장하고, 저장한 절대 경로를 돌려준다.",
     inputSchema: {
@@ -133,6 +150,14 @@ function arg<T>(args: Record<string, unknown>, key: string, ok: (v: unknown) => 
   return args[key] as T;
 }
 const isStr = (v: unknown) => typeof v === "string";
+
+function decodeBase64(b64: string): Uint8Array<ArrayBuffer> {
+  try {
+    return Uint8Array.from(atob(b64.replace(/\s/g, "")), (c) => c.charCodeAt(0));
+  } catch {
+    throw new Error("base64 형식이 올바르지 않습니다");
+  }
+}
 const isStrs = (v: unknown) => Array.isArray(v) && v.length > 0 && v.every(isStr);
 
 async function findLibrary(ctx: ToolCtx, id: string, use: "upload" | "download"): Promise<Library> {
@@ -217,6 +242,13 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
       const fileName = arg<string>(args, "name", isStr);
       const content = arg<string>(args, "content", isStr);
       return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), [fileName], async () => [new File([content], fileName, { type: "text/plain" })], args.overwrite === true);
+    }
+    case "upload_base64": {
+      const fileName = arg<string>(args, "name", isStr);
+      const bytes = decodeBase64(arg(args, "base64", isStr));
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
+      if (hash !== arg<string>(args, "sha256", isStr).trim().toLowerCase()) throw new Error("sha256이 맞지 않아 올리지 않았습니다. base64를 다시 구해 시도하세요.");
+      return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), [fileName], async () => [new File([bytes], fileName)], args.overwrite === true);
     }
     case "download":
       return download(ctx, arg(args, "library", isStr), arg(args, "paths", isStrs), isStr(args.local_dir) ? (args.local_dir as string) : undefined);
