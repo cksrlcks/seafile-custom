@@ -271,7 +271,7 @@ function ClaudePage() {
         <Snippet desc="터미널에서 한 번 실행한 뒤 Claude Code를 새로 여세요" code={"claude plugin marketplace add cksrlcks/u-drive\nclaude plugin install u-drive@u-drive"} />
       </Section>
       <Section title="Claude 데스크톱 앱">
-        <Row title="확장 파일 설치" desc="u-drive.mcpb를 받아 더블클릭하면 Claude에 확장으로 설치됩니다">
+        <Row title="확장 파일 설치" desc="u-drive.mcpb를 받은 뒤 Claude → 설정 → 확장 프로그램 화면에 끌어다 놓으면 설치됩니다. macOS는 파일을 더블클릭해도 됩니다">
           <button type="button" onClick={() => openExternal(MCPB_URL)} className={btnOutline}>
             받기
           </button>

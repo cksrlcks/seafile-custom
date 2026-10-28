@@ -2,19 +2,34 @@
   "manifest_version": "0.3",
   "name": "u-drive",
   "display_name": "U-Drive",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PC에 설치된 U-Drive 앱으로 드라이브에 파일을 올리고 받습니다. U-Drive 앱이 설치돼 있고 로그인돼 있어야 합니다.",
-  "author": { "name": "chang" },
+  "author": {
+    "name": "chang"
+  },
   "server": {
     "type": "binary",
-    "entry_point": "U-Drive 앱(이 번들에 들어 있지 않음)",
+    "entry_point": "U-Drive 앱(이 번들에 들어 있지 않음). macOS는 /Applications → ~/Applications → Spotlight 순서로 찾는다",
     "mcp_config": {
-      "command": "/Applications/Drive.app/Contents/MacOS/seadrive",
-      "args": ["--mcp"],
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "app=$(for a in /Applications/Drive.app \"$HOME/Applications/Drive.app\"; do [ -x \"$a/Contents/MacOS/seadrive\" ] && echo \"$a\" && break; done); [ -n \"$app\" ] || app=$(mdfind \"kMDItemCFBundleIdentifier == 'com.chang.seadrive'\" 2>/dev/null | head -n 1); [ -x \"$app/Contents/MacOS/seadrive\" ] && exec \"$app/Contents/MacOS/seadrive\" --mcp; echo \"U-Drive 앱을 찾을 수 없습니다. U-Drive를 응용 프로그램 폴더에 설치해 주세요.\" >&2; exit 1"
+      ],
       "platform_overrides": {
-        "win32": { "command": "${HOME}/AppData/Local/Drive/seadrive.exe" }
+        "win32": {
+          "command": "${HOME}/AppData/Local/Drive/seadrive.exe",
+          "args": [
+            "--mcp"
+          ]
+        }
       }
     }
   },
-  "compatibility": { "platforms": ["win32", "darwin"] }
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin"
+    ]
+  }
 }
