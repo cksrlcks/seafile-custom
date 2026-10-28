@@ -278,7 +278,7 @@ function ClaudePage() {
           command="connect_claude_code"
           done="연결했습니다. Claude Code를 새로 열면 쓸 수 있습니다."
           onDone={() => void status.refetch()}
-          manual={<Snippet desc="터미널에서 직접 실행해도 됩니다" code={`claude mcp add --scope user drive -- "${exe}" --mcp`} />}
+          manual={<Snippet desc="터미널에서 직접 실행해도 됩니다" code={`claude mcp add --scope user u-drive -- "${exe}" --mcp`} />}
         />
       </Section>
       <Section title="Claude 데스크톱 앱">
@@ -290,8 +290,8 @@ function ClaudePage() {
           onDone={() => void status.refetch()}
           manual={
             <Snippet
-              desc="Claude 데스크톱 앱 → 설정 → 개발자 → 구성 편집으로 연 claude_desktop_config.json의 mcpServers에 drive 항목을 직접 넣어도 됩니다"
-              code={JSON.stringify({ mcpServers: { drive: { command: exe, args: ["--mcp"] } } }, null, 2)}
+              desc="Claude 데스크톱 앱 → 설정 → 개발자 → 구성 편집으로 연 claude_desktop_config.json의 mcpServers에 u-drive 항목을 직접 넣어도 됩니다"
+              code={JSON.stringify({ mcpServers: { "u-drive": { command: exe, args: ["--mcp"] } } }, null, 2)}
             />
           }
         />

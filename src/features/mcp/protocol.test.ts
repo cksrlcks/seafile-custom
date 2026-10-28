@@ -9,7 +9,7 @@ describe("handleLine", () => {
     expect(r.id).toBe(1);
     expect(r.result.protocolVersion).toBe("2025-11-25");
     expect(r.result.capabilities).toEqual({ tools: {} });
-    expect(r.result.serverInfo).toEqual({ name: "drive", version: "1.2.3" });
+    expect(r.result.serverInfo).toEqual({ name: "u-drive", version: "1.2.3" });
     expect(r.result.instructions).toBe(INSTRUCTIONS);
   });
 

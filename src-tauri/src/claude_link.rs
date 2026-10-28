@@ -6,6 +6,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 const CONFIG: &str = "claude_desktop_config.json";
+/// Claude에 등록하는 MCP 서버 이름
+const NAME: &str = "u-drive";
+/// 0.9.0에서 쓰던 이름. 다시 연결할 때 이 앱을 가리키는 것만 지운다
+const OLD_NAME: &str = "drive";
 
 fn exe() -> Result<String, String> {
     std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string())
@@ -15,12 +19,16 @@ fn env_path(key: &str) -> Option<PathBuf> {
     std::env::var_os(key).map(PathBuf::from)
 }
 
-/// 설정 JSON에 mcpServers.drive가 이 exe로 들어 있는가
-fn has_drive(text: &str, exe: &str) -> bool {
-    serde_json::from_str::<Value>(text).ok().and_then(|v| v.pointer("/mcpServers/drive/command").cloned()) == Some(json!(exe))
+/// 설정 JSON에 mcpServers.<name>이 이 exe로 들어 있는가
+fn has_server(text: &str, name: &str, exe: &str) -> bool {
+    serde_json::from_str::<Value>(text).ok().and_then(|v| v.pointer(&format!("/mcpServers/{name}/command")).cloned()) == Some(json!(exe))
 }
 
-/// 기존 설정에 mcpServers.drive만 넣고 나머지는 그대로 둔다. 읽을 수 없는 파일은 덮어쓰지 않는다
+fn has_drive(text: &str, exe: &str) -> bool {
+    has_server(text, NAME, exe)
+}
+
+/// 기존 설정에 mcpServers.u-drive만 넣고(이 앱의 예전 drive 항목은 지운다) 나머지는 그대로 둔다. 읽을 수 없는 파일은 덮어쓰지 않는다
 fn merge_drive(existing: Option<&str>, exe: &str) -> Result<String, String> {
     let mut v: Value = match existing.map(str::trim).filter(|s| !s.is_empty()) {
         Some(s) => serde_json::from_str(s).map_err(|_| "Claude 설정 파일 형식이 올바르지 않아 고치지 않았습니다".to_string())?,
@@ -29,7 +37,10 @@ fn merge_drive(existing: Option<&str>, exe: &str) -> Result<String, String> {
     let root = v.as_object_mut().ok_or("Claude 설정 파일 형식이 올바르지 않아 고치지 않았습니다")?;
     let servers = root.entry("mcpServers").or_insert_with(|| json!({}));
     let servers = servers.as_object_mut().ok_or("Claude 설정 파일의 mcpServers 형식이 올바르지 않아 고치지 않았습니다")?;
-    servers.insert("drive".into(), json!({ "command": exe, "args": ["--mcp"] }));
+    if servers.get(OLD_NAME).and_then(|s| s.get("command")) == Some(&json!(exe)) {
+        servers.remove(OLD_NAME);
+    }
+    servers.insert(NAME.into(), json!({ "command": exe, "args": ["--mcp"] }));
     serde_json::to_string_pretty(&v).map_err(|e| e.to_string())
 }
 
@@ -141,9 +152,13 @@ pub async fn connect_claude_desktop() -> Result<(), String> {
 pub async fn connect_claude_code() -> Result<(), String> {
     let exe = exe()?;
     let home = env_path("HOME").or_else(|| env_path("USERPROFILE"));
+    let old_is_mine = home.as_ref().is_some_and(|h| has_server(&std::fs::read_to_string(h.join(".claude.json")).unwrap_or_default(), OLD_NAME, &exe));
     for bin in claude_candidates(home.as_deref()) {
-        let Ok(_) = run_claude(&bin, &["mcp", "remove", "drive", "-s", "user"]) else { continue }; // 실행이 안 되면 다음 후보. 등록이 없어서 실패한 건 괜찮다
-        let out = run_claude(&bin, &["mcp", "add", "--scope", "user", "drive", "--", &exe, "--mcp"]).map_err(|e| e.to_string())?;
+        let Ok(_) = run_claude(&bin, &["mcp", "remove", NAME, "-s", "user"]) else { continue }; // 실행이 안 되면 다음 후보. 등록이 없어서 실패한 건 괜찮다
+        if old_is_mine {
+            let _ = run_claude(&bin, &["mcp", "remove", OLD_NAME, "-s", "user"]);
+        }
+        let out = run_claude(&bin, &["mcp", "add", "--scope", "user", NAME, "--", &exe, "--mcp"]).map_err(|e| e.to_string())?;
         if out.status.success() {
             return Ok(());
         }
@@ -170,10 +185,22 @@ mod tests {
         let v: Value = serde_json::from_str(&after).unwrap();
         assert_eq!(v["preferences"]["a"], 1);
         assert_eq!(v["mcpServers"]["other"]["command"], "x");
-        assert_eq!(v["mcpServers"]["drive"], json!({ "command": r"C:\D\seadrive.exe", "args": ["--mcp"] }));
+        assert_eq!(v["mcpServers"][NAME], json!({ "command": r"C:\D\seadrive.exe", "args": ["--mcp"] }));
         assert!(after.find("preferences").unwrap() < after.find("\"z\"").unwrap(), "키 순서를 유지한다");
         assert!(has_drive(&after, r"C:\D\seadrive.exe"));
         assert!(!has_drive(&after, r"C:\other.exe"));
+    }
+
+    #[test]
+    fn merge_replaces_old_name_only_if_it_is_this_app() {
+        let mine = merge_drive(Some(r#"{"mcpServers":{"drive":{"command":"/a/Drive","args":["--mcp"]}}}"#), "/a/Drive").unwrap();
+        let v: Value = serde_json::from_str(&mine).unwrap();
+        assert!(v["mcpServers"].get(OLD_NAME).is_none(), "0.9.0에서 등록한 이 앱의 drive 항목은 지운다");
+        assert!(has_drive(&mine, "/a/Drive"));
+
+        let other = merge_drive(Some(r#"{"mcpServers":{"drive":{"command":"/other/tool"}}}"#), "/a/Drive").unwrap();
+        let v: Value = serde_json::from_str(&other).unwrap();
+        assert_eq!(v["mcpServers"][OLD_NAME]["command"], "/other/tool", "다른 프로그램의 drive 항목은 그대로 둔다");
     }
 
     #[test]

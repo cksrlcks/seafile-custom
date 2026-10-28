@@ -134,10 +134,10 @@ Claude의 행동은 이 안내문과 도구 설명으로 유도한다. 담을 �
 
 설정 대화상자에 "Claude 연결" 항목을 두고 두 가지를 복사 버튼과 함께 보여준다. 실행 파일 경로는 Rust에서 현재 실행 경로를 받아 채운다.
 
-- Claude Code: `claude mcp add drive -- "<실행 파일 경로>" --mcp`
+- Claude Code: `claude mcp add --scope user u-drive -- "<실행 파일 경로>" --mcp`
 - Claude 데스크톱 앱: `claude_desktop_config.json`에 넣을 JSON 조각과, 그 파일을 여는 버튼
   ```json
-  { "mcpServers": { "drive": { "command": "<실행 파일 경로>", "args": ["--mcp"] } } }
+  { "mcpServers": { "u-drive": { "command": "<실행 파일 경로>", "args": ["--mcp"] } } }
   ```
 - macOS 실행 파일 경로는 `/Applications/Drive.app/Contents/MacOS/Drive` 형태다.
 
