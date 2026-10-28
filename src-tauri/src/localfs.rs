@@ -1,4 +1,4 @@
-//! MCP 도구가 쓰는 로컬 파일 접근 (올릴 파일 읽기, 최근 다운로드, Claude 연결 안내)
+//! MCP 도구가 쓰는 로컬 파일 접근 (올릴 파일 읽기, 최근 다운로드, 작업 공간 파일 내려받기)
 
 use serde::Serialize;
 use std::path::Path;
@@ -61,11 +61,6 @@ pub async fn write_local_file(path: String, data: Vec<u8>) -> Result<(), String>
 #[tauri::command]
 pub fn recent_files(dir: String, limit: usize) -> Result<Vec<LocalFile>, String> {
     list_recent(Path::new(&dir), limit)
-}
-
-#[tauri::command]
-pub fn exe_path() -> String {
-    std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
 #[cfg(test)]

@@ -258,91 +258,25 @@ function GeneralPage() {
   );
 }
 
-/** Claude Code·Claude 데스크톱 앱에 이 실행 파일을 MCP(--mcp)로 등록하는 방법. 등록은 사용자가 직접 한다 */
-function ClaudePage() {
-  const app = isTauri();
-  const [exe, setExe] = useState("");
-  const status = useQuery({ queryKey: ["claude-status"], queryFn: () => invoke<{ code: boolean; desktop: boolean }>("claude_status"), enabled: app });
-  useEffect(() => {
-    if (app) void invoke<string>("exe_path").then(setExe);
-  }, [app]);
-  if (!app) return <p className="text-sm text-muted-foreground">설치된 앱에서만 쓸 수 있습니다</p>;
+const MCPB_URL = "https://github.com/cksrlcks/u-drive/raw/main/claude-plugin/u-drive.mcpb";
 
+/** Claude Code·Claude 데스크톱 앱에 U-Drive를 연결하는 방법. 연결은 사용자가 직접 한다(플러그인·확장 파일은 저장소의 claude-plugin/) */
+function ClaudePage() {
   return (
     <>
-      <p className="mb-6 text-sm text-muted-foreground">Claude에 U-Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, U-Drive 앱에 로그인돼 있어야 합니다.</p>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Claude에 U-Drive를 연결하면 "이 문서 유드라이브에 올려줘"처럼 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, U-Drive 앱에 로그인돼 있어야 합니다.
+      </p>
       <Section title="Claude Code">
-        <ConnectRow
-          title="Claude Code"
-          connected={status.data?.code}
-          command="connect_claude_code"
-          done="연결했습니다. Claude Code를 새로 열면 쓸 수 있습니다."
-          onDone={() => void status.refetch()}
-          manual={<Snippet desc="터미널에서 직접 실행해도 됩니다" code={`claude mcp add --scope user u-drive -- "${exe}" --mcp`} />}
-        />
+        <Snippet desc="터미널에서 한 번 실행한 뒤 Claude Code를 새로 여세요" code={"claude plugin marketplace add cksrlcks/u-drive\nclaude plugin install u-drive@u-drive"} />
       </Section>
       <Section title="Claude 데스크톱 앱">
-        <ConnectRow
-          title="Claude 데스크톱 앱"
-          connected={status.data?.desktop}
-          command="connect_claude_desktop"
-          waiting={async () =>
-            (await invoke<boolean>("claude_desktop_running")) ? "Claude 데스크톱 앱이 켜져 있습니다. 작업 표시줄 트레이 아이콘에서 Claude를 우클릭 → 종료하면 자동으로 연결합니다." : undefined
-          }
-          done="연결했습니다. 이제 Claude 데스크톱 앱을 여세요."
-          onDone={() => void status.refetch()}
-          manual={
-            <Snippet
-              desc="Claude 데스크톱 앱 → 설정 → 개발자 → 구성 편집으로 연 claude_desktop_config.json의 mcpServers에 u-drive 항목을 직접 넣어도 됩니다"
-              code={JSON.stringify({ mcpServers: { "u-drive": { command: exe, args: ["--mcp"] } } }, null, 2)}
-            />
-          }
-        />
+        <Row title="확장 파일 설치" desc="u-drive.mcpb를 받아 더블클릭하면 Claude에 확장으로 설치됩니다">
+          <button type="button" onClick={() => openExternal(MCPB_URL)} className={btnOutline}>
+            받기
+          </button>
+        </Row>
       </Section>
-    </>
-  );
-}
-
-async function invoke<T>(cmd: string): Promise<T> {
-  return (await import("@tauri-apps/api/core")).invoke<T>(cmd);
-}
-
-/** 연결 상태와 연결 버튼. 연결에 실패하면 직접 등록하는 방법을 펼친다. waiting이 문구를 돌려주면 연결이 끝날 때까지 그 문구를 보여 준다 */
-function ConnectRow({ title, connected, command, waiting, done, onDone, manual }: { title: string; connected: boolean | undefined; command: string; waiting?(): Promise<string | undefined>; done: string; onDone(): void; manual: ReactNode }) {
-  const [state, setState] = useState<{ busy?: boolean; waiting?: string; ok?: boolean; error?: string }>({});
-  const connect = async () => {
-    setState({ busy: true });
-    const w = await waiting?.().catch(() => undefined);
-    if (w) setState({ busy: true, waiting: w });
-    invoke(command).then(
-      () => {
-        setState({ ok: true });
-        onDone();
-      },
-      (e: unknown) => setState({ error: e instanceof Error ? e.message : String(e) }),
-    );
-  };
-  const desc = state.error ? (
-    <span className="text-destructive">연결하지 못했습니다 ({state.error})</span>
-  ) : state.waiting ? (
-    state.waiting
-  ) : state.ok ? (
-    done
-  ) : connected ? (
-    <span className="flex items-center gap-1.5">
-      <span className="size-2 rounded-full bg-success" /> 연결됨
-    </span>
-  ) : (
-    "연결 안 됨"
-  );
-  return (
-    <>
-      <Row title={title} desc={desc}>
-        <button type="button" disabled={state.busy} onClick={() => void connect()} className={btnOutline}>
-          {state.waiting ? "종료 기다리는 중…" : state.busy ? "연결 중…" : connected ? "다시 연결" : "연결"}
-        </button>
-      </Row>
-      {state.error && manual}
     </>
   );
 }
