@@ -101,6 +101,8 @@ export interface StorageProvider {
   isLoggedIn(): boolean;
 
   getAccount(): Promise<Account>;
+  /** 내가 속한 그룹 이름 */
+  listGroups(): Promise<string[]>;
   listLibraries(): Promise<Library[]>;
   renameLibrary(libId: string, newName: string): Promise<void>;
   starLibrary(libId: string, starred: boolean): Promise<void>;

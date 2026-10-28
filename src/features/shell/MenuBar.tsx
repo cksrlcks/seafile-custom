@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Menubar, MenubarCheckboxItem, MenubarContent, MenubarItem, MenubarMenu, MenubarRadioGroup, MenubarRadioItem, MenubarSeparator, MenubarShortcut, MenubarSub, MenubarSubContent, MenubarSubTrigger, MenubarTrigger } from "@/components/ui/menubar";
 import type { Sort, SortKey, ViewMode } from "@/features/browse/FileList";
-import { useSession } from "@/storage/StorageContext";
 import pkg from "../../../package.json";
 import { isTauri, modKey } from "./platform";
 
@@ -49,13 +48,6 @@ export function MenuBar(a: MenuActions) {
   const [dialog, setDialog] = useState<"shortcuts" | "about" | null>(null);
   const has = a.selection.count > 0;
   const quit = () => (isTauri() ? void import("@tauri-apps/api/core").then(({ invoke }) => invoke("quit")) : window.close());
-  // 일반 사용자용 비밀번호 변경 API가 없어서 Seafile 웹 설정 페이지를 브라우저로 연다
-  const { connection } = useSession().session;
-  const changePassword = () => {
-    const url = `${connection.baseUrl}/profile/`;
-    if (isTauri()) void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url));
-    else window.open(url, "_blank");
-  };
   const item = "text-sm";
   return (
     <>
@@ -91,9 +83,6 @@ export function MenuBar(a: MenuActions) {
             <MenubarSeparator />
             <MenubarItem onClick={a.settings} className={item}>
               설정…<MenubarShortcut>{MOD}+,</MenubarShortcut>
-            </MenubarItem>
-            <MenubarItem disabled={connection.kind !== "seafile"} onClick={changePassword} className={item}>
-              비밀번호 변경…
             </MenubarItem>
             <MenubarItem onClick={a.logout} className={item}>
               로그아웃

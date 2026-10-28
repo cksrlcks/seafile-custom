@@ -48,8 +48,15 @@ export class SeafileProvider implements StorageProvider {
   }
 
   async getAccount(): Promise<Account> {
-    const r = await this.api.get<{ email: string; name?: string; usage: number; total: number }>("/api2/account/info/");
-    return { email: r.email, name: r.name || r.email, usage: r.usage, quota: r.total > 0 ? r.total : null };
+    const r = await this.api.get<{ email: string; contact_email?: string; name?: string; usage: number; total: number }>("/api2/account/info/");
+    // email은 내부 ID(…@auth.local)일 수 있다. 사람이 아는 이메일은 contact_email
+    const email = r.contact_email || r.email;
+    return { email, name: r.name || email, usage: r.usage, quota: r.total > 0 ? r.total : null };
+  }
+
+  async listGroups(): Promise<string[]> {
+    const r = await this.api.get<{ name: string }[]>("/api/v2.1/groups/");
+    return r.map((g) => g.name);
   }
 
   async listLibraries(): Promise<Library[]> {

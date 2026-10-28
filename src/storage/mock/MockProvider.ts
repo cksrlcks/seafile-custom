@@ -55,6 +55,9 @@ export class MockProvider implements StorageProvider {
   isLoggedIn(): boolean {
     return this.token !== null;
   }
+  async listGroups(): Promise<string[]> {
+    return ["디자인팀", "집"];
+  }
   async getAccount(): Promise<Account> {
     await delay(150);
     const usage = [...this.tree.values()].flat().reduce((a, e) => a + e.size, 0) + 12_300_000_000;
