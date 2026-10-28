@@ -21,10 +21,11 @@ fn set_prefs(state: State<Mutex<Prefs>>, close_to_tray: bool, download_dir: Opti
     *state.lock().unwrap() = Prefs { close_to_tray, download_dir: download_dir.map(PathBuf::from) };
 }
 
-/// dir 안에서 name과 겹치지 않는 경로. 있으면 "이름 (1).확장자" 식으로 번호를 붙인다
+/// dir 안에서 name과 겹치지 않는 경로. 있으면 "이름 (1).확장자" 식으로 번호를 붙인다. dir이 없으면 만든다(Claude 전용 'U-Drive 작업' 폴더)
 #[tauri::command]
 fn free_path(dir: String, name: String) -> String {
     let dir = PathBuf::from(dir);
+    let _ = std::fs::create_dir_all(&dir);
     let p = std::path::Path::new(&name);
     let (stem, ext) = (p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(), p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default());
     let mut path = dir.join(&name);

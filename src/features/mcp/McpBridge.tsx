@@ -9,6 +9,8 @@ import { useStorage } from "@/storage/StorageContext";
 import { handleLine } from "./protocol";
 import type { LocalFile, ToolCtx } from "./tools";
 
+const defaultDownloadDir = async () => getPrefs().downloadDir ?? (await import("@tauri-apps/api/path")).downloadDir();
+
 /** 로그인된 동안의 도구 실행 환경. 로그아웃이면 null → tools/call은 로그인 안내로 답한다 */
 let currentCtx: ToolCtx | null = null;
 
@@ -59,7 +61,8 @@ export function McpToolProvider(): null {
       searchIndex: () => ({ entries: indexRef.current.entries, loading: indexRef.current.loading }),
       readLocalFile: async (path) => new File([await invoke<ArrayBuffer>("read_local_file", { path })], path.split(/[\\/]/).pop()!),
       freePath: (dir, name) => invoke<string>("free_path", { dir, name }),
-      defaultDownloadDir: async () => getPrefs().downloadDir ?? (await import("@tauri-apps/api/path")).downloadDir(),
+      defaultDownloadDir,
+      workDir: async () => (await import("@tauri-apps/api/path")).join(await defaultDownloadDir(), "U-Drive 작업"),
       recentFiles: (dir, limit) => invoke<LocalFile[]>("recent_files", { dir, limit }),
       writeLocalFile: (path, data) => invoke<void>("write_local_file", { path, data: Array.from(data) }),
     };

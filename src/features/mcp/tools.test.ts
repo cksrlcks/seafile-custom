@@ -14,12 +14,15 @@ function makeCtx(over: Partial<ToolCtx> = {}): ToolCtx {
     readLocalFile: async (p) => new File(["x"], p.split(/[\\/]/).pop()!),
     freePath: async (d, n) => `${d}/${n}`,
     defaultDownloadDir: async () => "C:/Downloads",
+    workDir: async () => "C:/Downloads/U-Drive 작업",
     recentFiles: async () => [],
     writeLocalFile: async () => {},
     ...over,
   };
 }
-const parse = (r: ToolResult) => JSON.parse(r.content[0].text);
+/** 첫 결과의 텍스트 */
+const txt = (r: ToolResult) => (r.content[0] as { text: string }).text;
+const parse = (r: ToolResult) => JSON.parse(txt(r));
 const SLOW = 10_000; // MockProvider 업로드는 약 2초
 
 describe("normalizeDir", () => {
@@ -62,8 +65,8 @@ describe("callTool", () => {
     const ctx = makeCtx();
     const many = await callTool("list_dir", { path: "/" }, ctx);
     expect(many.isError).toBe(true);
-    expect(many.content[0].text).toContain('"id":"docs"');
-    expect(many.content[0].text).not.toContain("vault"); // 암호화 저장소는 후보에서 뺀다
+    expect(txt(many)).toContain('"id":"docs"');
+    expect(txt(many)).not.toContain("vault"); // 암호화 저장소는 후보에서 뺀다
     const all = await ctx.storage.listLibraries();
     vi.spyOn(ctx.storage, "listLibraries").mockResolvedValue(all.filter((l) => l.id !== "photos"));
     const one = parse(await callTool("list_dir", { path: "회의록" }, ctx));
@@ -103,7 +106,7 @@ describe("callTool", () => {
     const ctx = makeCtx({ writeLocalFile: async (p) => void saved.push(p) });
     const bad = await callTool("upload_base64", { name: "a.docx", base64: HELLO.base64, sha256: "00", library: "docs", dir: "/보고" }, ctx);
     expect(bad.isError).toBe(true);
-    expect(bad.content[0].text).toContain("sha256");
+    expect(txt(bad)).toContain("sha256");
     expect((await ctx.storage.listDir("docs", "/")).some((e) => e.name === "보고")).toBe(false);
     const conflict = parse(await callTool("upload_base64", { name: "README.md", ...HELLO, library: "docs", dir: "/" }, ctx));
     expect(conflict).toMatchObject({ uploaded: [], conflicts: ["README.md"] });
@@ -131,20 +134,32 @@ describe("callTool", () => {
   it("rejects read-only and encrypted libraries", async () => {
     const ro = await callTool("upload_text", { name: "a.md", content: "a", library: "family", dir: "/" }, makeCtx());
     expect(ro.isError).toBe(true);
-    expect(ro.content[0].text).toContain("읽기 전용");
+    expect(txt(ro)).toContain("읽기 전용");
     const enc = await callTool("download", { library: "vault", paths: ["/a"] }, makeCtx());
     expect(enc.isError).toBe(true);
-    expect(enc.content[0].text).toContain("암호화");
+    expect(txt(enc)).toContain("암호화");
   });
 
   it("download refuses folders and returns saved paths", async () => {
     const folder = await callTool("download", { library: "docs", paths: ["/회의록"] }, makeCtx());
     expect(folder.isError).toBe(true);
-    expect(folder.content[0].text).toContain("파일만");
+    expect(txt(folder)).toContain("파일만");
     const r = parse(await callTool("download", { library: "docs", paths: ["/README.md"] }, makeCtx({ freePath: async (d, n) => `${d}/(1) ${n}` })));
-    expect(r).toEqual({ saved: ["C:/Downloads/(1) README.md"], failed: [] });
+    expect(r).toEqual({ saved: ["C:/Downloads/U-Drive 작업/(1) README.md"], failed: [] });
     const local = parse(await callTool("download", { library: "docs", paths: ["/README.md"], local_dir: "D:/work" }, makeCtx()));
     expect(local.saved).toEqual(["D:/work/README.md"]);
+  });
+
+  it("preview returns a thumbnail image or the text, and refuses other types", async () => {
+    const img = await callTool("preview", { library: "docs", path: "/로고.png" }, makeCtx());
+    expect(img.content[0]).toMatchObject({ type: "image", mimeType: "image/svg+xml" }); // mock 썸네일은 svg
+    expect(atob((img.content[0] as { data: string }).data)).toContain('width="1024"');
+    const text = await callTool("preview", { library: "docs", path: "회의록/2026-10-20.md" }, makeCtx());
+    expect(text.content[0]).toMatchObject({ type: "text" });
+    expect(txt(text).length).toBeGreaterThan(0);
+    const pdf = await callTool("preview", { library: "docs", path: "/계약서.pdf" }, makeCtx());
+    expect(pdf.isError).toBe(true);
+    expect(txt(pdf)).toContain("download");
   });
 
   it("search maps library names and flags loading", async () => {

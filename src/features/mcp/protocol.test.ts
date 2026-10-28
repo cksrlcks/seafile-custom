@@ -13,9 +13,9 @@ describe("handleLine", () => {
     expect(r.result.instructions).toBe(INSTRUCTIONS);
   });
 
-  it("tools/list returns the 8 tool names", async () => {
+  it("tools/list returns the 9 tool names", async () => {
     const r = await call({ id: 2, method: "tools/list" });
-    expect(r.result.tools.map((t: { name: string }) => t.name)).toEqual(["list_libraries", "list_dir", "search", "upload_file", "upload_text", "upload_base64", "download", "recent_downloads"]);
+    expect(r.result.tools.map((t: { name: string }) => t.name)).toEqual(["list_libraries", "list_dir", "preview", "search", "upload_file", "upload_text", "upload_base64", "download", "recent_downloads"]);
   });
 
   it("tools/call without ctx returns login error", async () => {

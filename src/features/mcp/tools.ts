@@ -1,4 +1,5 @@
 import type { DownloadQueue } from "@/features/download/downloadQueue";
+import { previewKind } from "@/features/preview/previewKind";
 import { searchEntries } from "@/features/search/searchIndex";
 import type { IndexedEntry } from "@/features/search/useSearchIndex";
 import type { UploadQueue } from "@/features/upload/uploadQueue";
@@ -26,18 +27,21 @@ export interface ToolCtx {
   freePath(dir: string, name: string): Promise<string>;
   /** 설정의 다운로드 폴더, 없으면 OS 다운로드 폴더 */
   defaultDownloadDir(): Promise<string>;
+  /** Claude 전용 받기 폴더(다운로드 폴더 아래 'U-Drive 작업'). 사용자가 앱에서 받는 파일과 섞이지 않게 한다 */
+  workDir(): Promise<string>;
   recentFiles(dir: string, limit: number): Promise<LocalFile[]>;
   /** 새 파일로 쓴다(있는 파일은 덮어쓰지 않는다) */
   writeLocalFile(path: string, data: Uint8Array): Promise<void>;
 }
 
 export interface ToolResult {
-  content: { type: "text"; text: string }[];
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
   isError?: boolean;
 }
 
 const str = (description: string) => ({ type: "string", description });
 const LIBRARY = str("저장소 id (list_libraries의 id)");
+const MY_LIBRARY = str("저장소 id. 생략하면 '내 저장소'의 저장소(하나뿐일 때). 여럿이면 후보를 알려준다");
 
 export const TOOLS: { name: string; description: string; inputSchema: object }[] = [
   {
@@ -51,9 +55,15 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
     description: "저장소 안 폴더의 파일·폴더 목록(크기·수정한 날짜는 읽기 좋은 형식). 올릴 위치를 제안하기 전에 기존 구조를 볼 때 쓴다.",
     inputSchema: {
       type: "object",
-      properties: { library: str("저장소 id. 생략하면 '내 저장소'의 저장소(하나뿐일 때). 여럿이면 후보를 알려준다"), path: str("'/'로 시작하는 폴더 경로. 루트는 '/'") },
+      properties: { library: MY_LIBRARY, path: str("'/'로 시작하는 폴더 경로. 루트는 '/'") },
       required: ["path"],
     },
+  },
+  {
+    name: "preview",
+    description:
+      "드라이브 파일을 PC에 저장하지 않고 바로 본다. 사용자가 파일을 보여 달라·열어 달라·내용이 뭐냐고 하면 download 대신 이걸 쓴다. 이미지(긴 변 1024px 축소본)와 텍스트 파일(md·txt·json·코드 등)만 된다. 그 밖의 형식이거나, 원본이 필요하거나, 파일로 작업(수정·분석)해야 하면 download를 쓴다.",
+    inputSchema: { type: "object", properties: { library: MY_LIBRARY, path: str("파일 경로('/'로 시작)") }, required: ["path"] },
   },
   {
     name: "search",
@@ -109,13 +119,14 @@ export const TOOLS: { name: string; description: string; inputSchema: object }[]
   },
   {
     name: "download",
-    description: "드라이브 파일을 사용자 PC에 받는다(폴더는 안 됨). 같은 이름이 있으면 번호를 붙여 저장하고, 저장한 절대 경로를 돌려준다.",
+    description:
+      "드라이브 파일을 사용자 PC에 받는다(폴더는 안 됨). 파일로 작업(수정·분석)하거나 원본이 필요할 때 쓴다. 보여 주기만 하면 preview를 쓴다. 같은 이름이 있으면 번호를 붙여 저장하고, 저장한 절대 경로를 돌려준다.",
     inputSchema: {
       type: "object",
       properties: {
         library: LIBRARY,
         paths: { type: "array", items: { type: "string" }, description: "받을 파일 경로들('/'로 시작)" },
-        local_dir: str("저장할 로컬 폴더의 절대 경로. Claude Code면 현재 작업 폴더. 모르면 생략(다운로드 폴더에 저장)"),
+        local_dir: str("저장할 로컬 폴더의 절대 경로. Claude Code면 현재 작업 폴더. 모르면 생략(다운로드 폴더 아래 'U-Drive 작업' 폴더에 저장)"),
       },
       required: ["library", "paths"],
     },
@@ -203,18 +214,18 @@ async function upload(ctx: ToolCtx, libId: string, dir: string, names: string[],
   });
 }
 
+async function findFile(ctx: ToolCtx, libId: string, p: string): Promise<Entry> {
+  const path = normalizeDir(p);
+  const e = (await ctx.storage.listDir(libId, parentPath(path))).find((x) => x.name === baseName(path));
+  if (!e) throw new Error(`파일을 찾을 수 없습니다: ${path}`);
+  if (e.type !== "file") throw new Error(`파일만 받을 수 있습니다: ${path}`);
+  return e;
+}
+
 async function download(ctx: ToolCtx, libId: string, paths: string[], localDir?: string): Promise<ToolResult> {
   await findLibrary(ctx, libId, "download");
-  const entries = await Promise.all(
-    paths.map(async (p) => {
-      const path = normalizeDir(p);
-      const e = (await ctx.storage.listDir(libId, parentPath(path))).find((x) => x.name === baseName(path));
-      if (!e) throw new Error(`파일을 찾을 수 없습니다: ${path}`);
-      if (e.type !== "file") throw new Error(`파일만 받을 수 있습니다: ${path}`);
-      return e;
-    }),
-  );
-  const dir = localDir ?? (await ctx.defaultDownloadDir());
+  const entries = await Promise.all(paths.map((p) => findFile(ctx, libId, p)));
+  const dir = localDir ?? (await ctx.workDir());
   // ponytail: 디스크에 있는 이름만 피한다(downloadEntries와 같은 한계). 같은 이름 둘을 한 번에 받으면 겹칠 수 있음
   const targets = await Promise.all(entries.map((e) => ctx.freePath(dir, e.name)));
   const ids = ctx.downloads.add(entries.map((e, i) => ({ name: e.name, size: e.size, url: () => ctx.storage.downloadUrl(libId, e.path), path: targets[i] })));
@@ -223,6 +234,31 @@ async function download(ctx: ToolCtx, libId: string, paths: string[], localDir?:
     saved: items.filter((i) => i.status === "done").map((i) => i.job.path),
     failed: items.flatMap((i, n) => (i.status === "done" ? [] : [{ path: entries[n].path, error: i.error ?? "실패" }])),
   });
+}
+
+const PREVIEW_IMAGE_SIZE = 1024;
+/** 앱 미리보기와 같은 상한. 이보다 큰 텍스트는 download로 받게 한다 */
+const PREVIEW_TEXT_LIMIT = 1024 * 1024;
+
+function toBase64(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/** 이미지는 서버 축소본, 텍스트는 내용을 그대로 돌려준다. PC에는 아무것도 쓰지 않는다 */
+async function preview(ctx: ToolCtx, libId: string, path: string): Promise<ToolResult> {
+  await findLibrary(ctx, libId, "download");
+  const e = await findFile(ctx, libId, path);
+  // svg는 Claude가 이미지로 받지 않아 텍스트로 준다
+  const kind = /\.svg$/i.test(e.name) ? "text" : previewKind(e.name);
+  if (kind === "image") {
+    const blob = await ctx.storage.thumbnail(libId, e.path, PREVIEW_IMAGE_SIZE);
+    return { content: [{ type: "image", data: toBase64(new Uint8Array(await blob.arrayBuffer())), mimeType: blob.type || "image/png" }] };
+  }
+  if (kind !== "text") throw new Error(`미리 볼 수 없는 형식입니다: ${e.name}. 내용이 필요하면 download로 받으세요.`);
+  if (e.size > PREVIEW_TEXT_LIMIT) throw new Error(`1MB가 넘는 텍스트는 미리 볼 수 없습니다: ${e.name}. download로 받으세요.`);
+  return { content: [{ type: "text", text: await ctx.storage.readText(libId, e.path) }] };
 }
 
 /** 도구 실행. 실패는 isError 결과로 돌려준다. 로그인 만료(401)만 그대로 던져 호출하는 쪽이 로그인 안내로 바꾼다 */
@@ -245,6 +281,8 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
       // Claude가 숫자를 날짜·크기로 바꾸느라 코드를 돌리지 않게 읽기 좋은 형식으로 준다
       return json(entries.map((e) => ({ name: e.name, type: e.type, size: e.type === "file" ? formatSize(e.size) : undefined, modified: formatDate(e.mtime) })));
     }
+    case "preview":
+      return preview(ctx, isStr(args.library) ? (args.library as string) : await myLibraryId(ctx), arg(args, "path", isStr));
     case "search": {
       const { entries, loading } = ctx.searchIndex();
       const libNames = new Map((await ctx.storage.listLibraries()).map((l) => [l.id, l.name]));
