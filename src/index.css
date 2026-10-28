@@ -161,12 +161,12 @@
     --menu-separator: rgb(255 255 255 / .1);
     --dialog-footer: oklch(0.18 0 0);
     --dialog-footer-border: oklch(1 0 0 / 10%);
-    --primary-hover: oklch(0.87 0 0);
-    --primary-active: oklch(0.8 0 0);
+    --primary-hover: #2d80e6;
+    --primary-active: #1966c4;
     --destructive-hover: oklch(0.74 0.17 22.2);
     --outline-hover: oklch(0.25 0 0);
-    --primary-edge: oklch(0.85 0 0);
-    --primary-edge-bottom: oklch(0.75 0 0);
+    --primary-edge: #1a68c8;
+    --primary-edge-bottom: #1557a8;
     --outline-edge: oklch(1 0 0 / 14%);
     --outline-edge-bottom: oklch(1 0 0 / 8%);
     --destructive-edge: oklch(0.65 0.19 22.2);
@@ -188,8 +188,9 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    /* 라이트보다 한 단계 밝은 파랑: 흰 글씨(4.6:1)와 어두운 배경 위 파란 글씨(4.3:1) 모두 읽히게 */
+    --primary: #1f74db;
+    --primary-foreground: #ffffff;
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -200,7 +201,7 @@
     --success: oklch(0.75 0.17 150);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --ring: #1f74db;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -208,12 +209,12 @@
     --chart-5: oklch(0.269 0 0);
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary: #1f74db;
     --sidebar-primary-foreground: oklch(0.985 0 0);
     --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar-ring: #1f74db;
 }
 
 @layer base {
