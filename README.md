@@ -10,7 +10,7 @@ Tauri 2 + React 19 + TypeScript(Vite)로 만들었습니다.
 
 | OS | 파일 |
 | --- | --- |
-| Windows | `Drive_<버전>_x64-setup.exe` 또는 `.msi` |
+| Windows | `Drive_<버전>_x64-setup.exe` |
 | macOS (Apple Silicon·Intel) | `Drive_<버전>_universal.dmg` |
 
 macOS는 ad-hoc 서명이라 처음 한 번 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**가 필요합니다. 자세한 내용은 [docs/macos-release.md](docs/macos-release.md).
