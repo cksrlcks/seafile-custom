@@ -4,7 +4,7 @@ import { callTool, TOOLS, type ToolCtx, type ToolResult } from "./tools";
 /** initialize 응답으로 Claude에게 주는 안내. Claude의 행동(먼저 묻기·위치 제안·확인 후 업로드)은 이것으로 유도한다 */
 export const INSTRUCTIONS = [
   "Drive는 사용자의 회사 드라이브에 파일을 올리고 받는 도구다.",
-  "사용자가 문서 작성이나 수정을 끝내면, 먼저 '드라이브에도 올릴까요?'라고 물어본다.",
+  "사용자가 드라이브에 올려 달라고 말할 때만 올린다. 문서를 다 썼다고 해서 먼저 '드라이브에 올릴까요?'라고 묻지 않는다.",
   "올리기 전에 list_libraries와 list_dir로 사용자 본인 저장소(section '내 저장소')의 기존 폴더 구조를 보고, 그에 맞는 폴더 경로를 제안한다. 새 폴더가 필요하면 '이 폴더를 만들어서 올릴까요?'라고 말한다.",
   "사용자가 확인하기 전에는 절대 upload_file·upload_text를 호출하지 않는다.",
   "응답에 conflicts가 있으면 같은 이름 파일을 덮어쓸지 사용자에게 묻고, 동의할 때만 overwrite: true로 다시 호출한다.",
