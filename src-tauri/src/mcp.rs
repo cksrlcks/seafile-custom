@@ -31,15 +31,16 @@ pub struct Hub {
     pending: Mutex<Option<Vec<(u64, String)>>>,
     /// WebView에 넘겼지만 아직 답이 없는 요청 (연결, JSON id). 새로고침 때 오류로 끝내려고 기억한다
     inflight: Mutex<HashSet<(u64, String)>>,
-    /// 연결 수가 바뀔 때 (사이드바의 "Claude 연결됨" 표시용)
-    on_count: std::sync::OnceLock<Box<dyn Fn(usize) + Send + Sync>>,
+    /// 연결마다 어느 Claude인지(initialize의 clientInfo로 안다). 사이드바의 "Claude Code 연결됨" 표시용
+    clients: Mutex<std::collections::HashMap<u64, String>>,
+    on_clients: std::sync::OnceLock<Box<dyn Fn(Vec<String>) + Send + Sync>>,
 }
 
 impl Hub {
     pub fn start(token: String, on_line: impl Fn(u64, String) + Send + Sync + 'static) -> io::Result<(Arc<Hub>, u16)> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr()?.port();
-        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())), inflight: Default::default(), on_count: Default::default() });
+        let hub = Arc::new(Hub { token, on_line: Box::new(on_line), conns: Default::default(), pending: Mutex::new(Some(Vec::new())), inflight: Default::default(), clients: Default::default(), on_clients: Default::default() });
         let h = hub.clone();
         std::thread::spawn(move || {
             for (id, stream) in (1u64..).zip(listener.incoming()) {
@@ -59,29 +60,43 @@ impl Hub {
             _ => return, // 토큰이 틀리면 두 핸들이 모두 drop되어 연결이 닫힌다
         }
         self.conns.lock().unwrap().insert(id, write);
-        self.notify_count();
+        self.set_client(id, Some("Claude".into()));
         for line in lines {
             let Ok(line) = line else { break };
             let line = line.trim_end_matches('\r');
             if !line.is_empty() {
+                if let Some(label) = client_label(line) {
+                    self.set_client(id, Some(label));
+                }
                 self.dispatch(id, line.to_string());
             }
         }
         self.conns.lock().unwrap().remove(&id);
-        self.notify_count();
+        self.set_client(id, None);
     }
 
-    pub fn connections(&self) -> usize {
-        self.conns.lock().unwrap().len()
+    /// 지금 연결된 Claude 종류(중복 없이, 이름순)
+    pub fn clients(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.clients.lock().unwrap().values().cloned().collect();
+        v.sort();
+        v.dedup();
+        v
     }
 
-    pub fn on_count(&self, f: impl Fn(usize) + Send + Sync + 'static) {
-        let _ = self.on_count.set(Box::new(f));
+    pub fn on_clients(&self, f: impl Fn(Vec<String>) + Send + Sync + 'static) {
+        let _ = self.on_clients.set(Box::new(f));
     }
 
-    fn notify_count(&self) {
-        if let Some(f) = self.on_count.get() {
-            f(self.connections());
+    fn set_client(&self, id: u64, label: Option<String>) {
+        {
+            let mut c = self.clients.lock().unwrap();
+            match label {
+                Some(l) => c.insert(id, l),
+                None => c.remove(&id),
+            };
+        }
+        if let Some(f) = self.on_clients.get() {
+            f(self.clients());
         }
     }
 
@@ -128,6 +143,16 @@ impl Hub {
             let _ = self.respond(conn, &rpc_error(&rid, "U-Drive 앱 화면이 다시 시작됐습니다. 다시 시도해 주세요."));
         }
     }
+}
+
+/// initialize 요청이면 보낸 앱 이름. clientInfo.name이 Claude Code는 claude-code, Claude 데스크톱 앱은 claude-ai
+fn client_label(line: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    if v.get("method")?.as_str()? != "initialize" {
+        return None;
+    }
+    let name = v.pointer("/params/clientInfo/name").and_then(|n| n.as_str()).unwrap_or_default().to_lowercase();
+    Some(if name.contains("claude-code") { "Claude Code" } else if name.contains("claude") { "Claude 데스크톱" } else { "Claude" }.into())
 }
 
 fn rpc_error(id: &str, message: &str) -> String {
@@ -303,8 +328,8 @@ pub fn setup(app: &AppHandle) {
         Err(e) => return eprintln!("MCP 리스너를 열지 못했습니다: {e}"),
     };
     let handle = app.clone();
-    hub.on_count(move |n| {
-        let _ = handle.emit("mcp-connections", n);
+    hub.on_clients(move |v| {
+        let _ = handle.emit("mcp-clients", v);
     });
     if let Some(path) = mcp_json_path() {
         let _ = std::fs::create_dir_all(path.parent().unwrap());
@@ -318,10 +343,10 @@ pub fn mcp_ready(hub: State<Arc<Hub>>) {
     hub.set_ready();
 }
 
-/// 지금 연결된 Claude 수. 화면은 mcp-connections 이벤트를 먼저 듣고 이걸로 처음 값을 읽는다
+/// 지금 연결된 Claude 종류. 화면은 mcp-clients 이벤트를 먼저 듣고 이걸로 처음 값을 읽는다
 #[tauri::command]
-pub fn mcp_connections(hub: State<Arc<Hub>>) -> usize {
-    hub.connections()
+pub fn mcp_clients(hub: State<Arc<Hub>>) -> Vec<String> {
+    hub.clients()
 }
 
 #[tauri::command]
@@ -391,17 +416,25 @@ mod tests {
     }
 
     #[test]
-    fn hub_reports_connection_count() {
+    fn hub_reports_which_clients_are_connected() {
         let (hub, port, _) = recording_hub();
-        let counts: Arc<Mutex<Vec<usize>>> = Default::default();
-        let c = counts.clone();
-        hub.on_count(move |n| c.lock().unwrap().push(n));
+        hub.set_ready();
+        let seen: Arc<Mutex<Vec<Vec<String>>>> = Default::default();
+        let c = seen.clone();
+        hub.on_clients(move |v| c.lock().unwrap().push(v));
         let _wrong = client(port, "wrong");
-        let s = client(port, "tok");
-        assert!(wait_until(|| hub.connections() == 1));
-        drop(s);
-        assert!(wait_until(|| hub.connections() == 0));
-        assert_eq!(*counts.lock().unwrap(), vec![1, 0], "토큰이 틀린 연결은 세지 않는다");
+        let mut code = client(port, "tok");
+        assert!(wait_until(|| hub.clients() == ["Claude"]), "initialize 전에는 어느 앱인지 모른다");
+        writeln!(code, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"claude-code","version":"2.1"}}}}}}"#).unwrap();
+        assert!(wait_until(|| hub.clients() == ["Claude Code"]));
+        let mut desktop = client(port, "tok");
+        writeln!(desktop, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"clientInfo":{{"name":"claude-ai","version":"0.1"}}}}}}"#).unwrap();
+        assert!(wait_until(|| hub.clients() == ["Claude Code", "Claude 데스크톱"]));
+        drop(code);
+        assert!(wait_until(|| hub.clients() == ["Claude 데스크톱"]));
+        drop(desktop);
+        assert!(wait_until(|| hub.clients().is_empty()));
+        assert_eq!(seen.lock().unwrap().last(), Some(&vec![]), "토큰이 틀린 연결은 세지 않고, 바뀔 때마다 알린다");
     }
 
     #[test]
