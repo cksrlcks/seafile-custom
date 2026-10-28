@@ -6,7 +6,7 @@ Tauri 2 + React 19 + TypeScript(Vite)로 만들었습니다.
 
 ## 설치
 
-[Releases](https://github.com/cksrlcks/seafile-custom/releases/latest)에서 받습니다.
+[Releases](https://github.com/cksrlcks/u-drive/releases/latest)에서 받습니다.
 
 | OS | 파일 |
 | --- | --- |
