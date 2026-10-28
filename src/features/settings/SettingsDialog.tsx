@@ -270,7 +270,7 @@ function ClaudePage() {
 
   return (
     <>
-      <p className="mb-6 text-sm text-muted-foreground">Claude에 U-Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, Drive 앱에 로그인돼 있어야 합니다.</p>
+      <p className="mb-6 text-sm text-muted-foreground">Claude에 U-Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, U-Drive 앱에 로그인돼 있어야 합니다.</p>
       <Section title="Claude Code">
         <ConnectRow
           title="Claude Code"
@@ -286,7 +286,10 @@ function ClaudePage() {
           title="Claude 데스크톱 앱"
           connected={status.data?.desktop}
           command="connect_claude_desktop"
-          done="연결했습니다. Claude 데스크톱 앱을 완전히 종료한 뒤(트레이 아이콘 → 종료) 다시 여세요."
+          waiting={async () =>
+            (await invoke<boolean>("claude_desktop_running")) ? "Claude 데스크톱 앱이 켜져 있습니다. 작업 표시줄 트레이 아이콘에서 Claude를 우클릭 → 종료하면 자동으로 연결합니다." : undefined
+          }
+          done="연결했습니다. 이제 Claude 데스크톱 앱을 여세요."
           onDone={() => void status.refetch()}
           manual={
             <Snippet
@@ -304,11 +307,13 @@ async function invoke<T>(cmd: string): Promise<T> {
   return (await import("@tauri-apps/api/core")).invoke<T>(cmd);
 }
 
-/** 연결 상태와 연결 버튼. 연결에 실패하면 직접 등록하는 방법을 펼친다 */
-function ConnectRow({ title, connected, command, done, onDone, manual }: { title: string; connected: boolean | undefined; command: string; done: string; onDone(): void; manual: ReactNode }) {
-  const [state, setState] = useState<{ busy?: boolean; ok?: boolean; error?: string }>({});
-  const connect = () => {
+/** 연결 상태와 연결 버튼. 연결에 실패하면 직접 등록하는 방법을 펼친다. waiting이 문구를 돌려주면 연결이 끝날 때까지 그 문구를 보여 준다 */
+function ConnectRow({ title, connected, command, waiting, done, onDone, manual }: { title: string; connected: boolean | undefined; command: string; waiting?(): Promise<string | undefined>; done: string; onDone(): void; manual: ReactNode }) {
+  const [state, setState] = useState<{ busy?: boolean; waiting?: string; ok?: boolean; error?: string }>({});
+  const connect = async () => {
     setState({ busy: true });
+    const w = await waiting?.().catch(() => undefined);
+    if (w) setState({ busy: true, waiting: w });
     invoke(command).then(
       () => {
         setState({ ok: true });
@@ -319,6 +324,8 @@ function ConnectRow({ title, connected, command, done, onDone, manual }: { title
   };
   const desc = state.error ? (
     <span className="text-destructive">연결하지 못했습니다 ({state.error})</span>
+  ) : state.waiting ? (
+    state.waiting
   ) : state.ok ? (
     done
   ) : connected ? (
@@ -331,8 +338,8 @@ function ConnectRow({ title, connected, command, done, onDone, manual }: { title
   return (
     <>
       <Row title={title} desc={desc}>
-        <button type="button" disabled={state.busy} onClick={connect} className={btnOutline}>
-          {state.busy ? "연결 중…" : connected ? "다시 연결" : "연결"}
+        <button type="button" disabled={state.busy} onClick={() => void connect()} className={btnOutline}>
+          {state.waiting ? "종료 기다리는 중…" : state.busy ? "연결 중…" : connected ? "다시 연결" : "연결"}
         </button>
       </Row>
       {state.error && manual}

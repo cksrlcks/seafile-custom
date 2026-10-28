@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 const CONFIG: &str = "claude_desktop_config.json";
 /// Claude에 등록하는 MCP 서버 이름
@@ -142,12 +143,37 @@ pub fn claude_status() -> Result<ClaudeStatus, String> {
     })
 }
 
+/// running이 연속 두 번 false일 때까지 기다린다(종료하면서 설정을 쓰는 중일 수 있어 한 번 더 본다). timeout이 지나면 false
+fn wait_until_closed(mut running: impl FnMut() -> bool, interval: Duration, timeout: Duration) -> bool {
+    let end = Instant::now() + timeout;
+    let mut quiet = 0;
+    while Instant::now() < end {
+        quiet = if running() { 0 } else { quiet + 1 };
+        if quiet == 2 {
+            return true;
+        }
+        std::thread::sleep(interval);
+    }
+    false
+}
+
+/// 화면이 연결 전에 "Claude를 종료하면 연결합니다"를 띄울지 정할 때 쓴다
+#[tauri::command]
+pub async fn claude_desktop_running() -> bool {
+    tauri::async_runtime::spawn_blocking(desktop_running).await.unwrap_or(false)
+}
+
+/// Claude 데스크톱 앱이 켜져 있으면 꺼질 때까지(최대 10분) 기다렸다가 설정 파일에 넣는다
 #[tauri::command]
 pub async fn connect_claude_desktop() -> Result<(), String> {
-    if desktop_running() {
-        return Err("Claude 데스크톱 앱이 켜져 있으면 연결이 지워집니다. 트레이 아이콘에서 Claude를 완전히 종료한 뒤 다시 눌러 주세요".into());
-    }
-    connect_desktop_at(&desktop_config_files(), &exe()?)
+    tauri::async_runtime::spawn_blocking(|| {
+        if !wait_until_closed(desktop_running, Duration::from_secs(2), Duration::from_secs(600)) {
+            return Err("10분 안에 Claude 데스크톱 앱이 종료되지 않아 연결을 멈췄습니다. Claude를 종료한 뒤 다시 눌러 주세요".to_string());
+        }
+        connect_desktop_at(&desktop_config_files(), &exe()?)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Claude 데스크톱 앱의 실행 파일인가. Claude Code CLI도 이름이 claude.exe라 설치 위치로 가린다(MSIX: WindowsApps\Claude_*, 일반: AnthropicClaude)
@@ -231,6 +257,17 @@ mod tests {
         assert!(merge_drive(Some("{ broken"), "/a/Drive").is_err());
         assert!(merge_drive(Some("[]"), "/a/Drive").is_err());
         assert!(merge_drive(Some(r#"{"mcpServers":[]}"#), "/a/Drive").is_err());
+    }
+
+    #[test]
+    fn wait_closed_needs_two_quiet_checks_and_times_out() {
+        let ms = Duration::from_millis(1);
+        // 켜짐, 켜짐, 꺼짐, 꺼짐 → 연속 두 번 꺼져 있어야 끝난다(종료하면서 설정을 쓰는 중일 수 있다)
+        let mut seq = [true, true, false, false].into_iter();
+        let mut calls = 0;
+        assert!(wait_until_closed(|| { calls += 1; seq.next().unwrap_or(false) }, ms, Duration::from_secs(5)));
+        assert_eq!(calls, 4);
+        assert!(!wait_until_closed(|| true, ms, Duration::from_millis(20)), "계속 켜져 있으면 시간이 지나 포기한다");
     }
 
     #[test]
