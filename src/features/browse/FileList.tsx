@@ -1,4 +1,4 @@
-import { IconArrowDown, IconArrowUp, IconFile, IconFolderUp, IconFileZip, IconFileMusic, IconCode, IconLink, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconFile, IconFileZip, IconFileMusic, IconCode, IconLink, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { formatDateLong, formatSize } from "@/lib/format";
@@ -44,7 +44,16 @@ export function SharedBadge({ className }: { className?: string }) {
   );
 }
 
-/** 새 폴더 입력 줄의 아이콘용. 셸 아이콘은 종류·이름만 보므로 나머지는 빈 값 */
+/** 상위 폴더("...") 항목의 폴더 아이콘 모서리 배지. 채운 원 안에 위 화살표 */
+export function UpBadge({ className, iconClassName }: { className?: string; iconClassName?: string }) {
+  return (
+    <span className={cn("absolute flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-item", className)}>
+      <IconArrowUp className={iconClassName} stroke={3} />
+    </span>
+  );
+}
+
+/** 새 폴더 입력 줄·상위 폴더 항목의 아이콘용. 셸 아이콘은 종류·이름만 보므로 나머지는 빈 값 */
 export const NEW_FOLDER_ENTRY: Entry = { id: "", name: "", type: "dir", size: 0, mtime: 0, path: "" };
 
 /** Tauri(윈도우·맥)면 셸 아이콘(img), 아니면 SVG. fallback은 셸 아이콘이 없을 때 폴더 대신 그릴 것(그리드의 FolderGlyph) */
@@ -78,7 +87,7 @@ export interface ListProps {
   onCreateFolderCancel(): void;
   /** 끌어 옮기는 중 지금 놓을 폴더 */
   dropTarget?: string | null;
-  /** 하위 폴더면 맨 위 ".." 항목의 경로. 더블클릭하면 올라가고, 끌어다 놓으면 상위 폴더로 옮긴다. 선택·정렬 대상은 아니다 */
+  /** 하위 폴더면 맨 위 "..." 항목의 경로. 더블클릭하면 올라가고, 끌어다 놓으면 상위 폴더로 옮긴다. 선택·정렬 대상은 아니다 */
   parentDir?: string | null;
   onOpenParent?(): void;
 }
@@ -112,8 +121,11 @@ export function FileList(p: ListProps) {
           <tr data-drop={p.parentDir} title="상위 폴더" onDoubleClick={p.onOpenParent} className={cn("h-8.5 cursor-default select-none", p.dropTarget === p.parentDir && "bg-primary/10 outline-2 -outline-offset-2 outline-primary")}>
             <td className="pl-3" colSpan={4}>
               <span className="flex items-center gap-2">
-                <IconFolderUp className="size-4 text-primary" stroke={1.75} />
-                ..
+                <span className="relative shrink-0">
+                  <EntryIcon entry={NEW_FOLDER_ENTRY} />
+                  <UpBadge className="-right-1 -bottom-0.5 size-2.5" iconClassName="size-2" />
+                </span>
+                ...
               </span>
             </td>
           </tr>
@@ -139,7 +151,7 @@ export function FileList(p: ListProps) {
               dataPath={e.path}
               className={cn(
                 "h-8.5 cursor-default select-none",
-                (i + (p.parentDir != null ? 1 : 0)) % 2 === 1 && !sel && "bg-muted/60", // ".." 줄까지 이어서 줄무늬
+                (i + (p.parentDir != null ? 1 : 0)) % 2 === 1 && !sel && "bg-muted/60", // "..." 줄까지 이어서 줄무늬
                 sel && "bg-selection",
                 p.focusPath === e.path && "outline-1 -outline-offset-1 outline-primary/60",
                 p.dropTarget === e.path && "bg-primary/10 outline-2 -outline-offset-2 outline-primary",

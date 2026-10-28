@@ -14,7 +14,7 @@ export interface DragState {
 /**
  * 항목의 [data-drag] 부분(아이콘·이름)을 끌어 같은 목록의 폴더 위에 놓으면 onDrop — 탐색기처럼 나머지 빈 곳에서는 드래그 선택.
  * 끄는 항목이 선택돼 있으면 선택 전체, 아니면 그 항목만 옮긴다. 자기 자신 위에는 못 놓고, Esc로 취소한다.
- * 항목이 아닌 놓을 곳(상위 폴더 ".." 줄)은 [data-drop="경로"]로 표시한다.
+ * 항목이 아닌 놓을 곳(상위 폴더 "..." 줄)은 [data-drop="경로"]로 표시한다.
  * onPointerDown이 true를 돌려주면 이 훅이 맡았으니 드래그 선택을 시작하지 않는다.
  */
 export function useDragMove(entries: Entry[], selected: Set<string>, onStart: (paths: Set<string>) => void, onDrop: (items: Entry[], dstDir: string) => void, disabled: boolean) {

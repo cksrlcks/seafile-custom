@@ -1,9 +1,8 @@
-import { IconFolderUp } from "@tabler/icons-react";
 import { cn } from "cn";
 import { FolderGlyph } from "@/components/ui/folder-glyph";
 import { EntryContextMenu } from "./ContextMenu";
 import type { Entry } from "@/storage/StorageProvider";
-import { EntryIcon, NEW_FOLDER_ENTRY, SharedBadge, type ListProps } from "./FileList";
+import { EntryIcon, NEW_FOLDER_ENTRY, SharedBadge, UpBadge, type ListProps } from "./FileList";
 import { InlineName } from "./InlineName";
 import { useThumbnail } from "./useThumbnail";
 import { uniqueName } from "./validateName";
@@ -33,9 +32,13 @@ export function IconGrid(p: ListProps & { libId: string | null; iconSize: number
           className={cn("flex cursor-default flex-col items-center gap-1 rounded-md p-2 select-none hover:bg-accent/60", p.dropTarget === p.parentDir && "bg-primary/10 outline-2 -outline-offset-2 outline-primary")}
         >
           <div className={cn("flex items-center justify-center", s.box)}>
-            <IconFolderUp className={cn("text-primary", s.icon)} stroke={1.25} />
+            {/* 배지는 칸이 아니라 아이콘 모서리에 붙인다(셸 아이콘은 칸보다 훨씬 작다) */}
+            <span className="relative flex">
+              <EntryIcon entry={NEW_FOLDER_ENTRY} size={48} className={s.icon} fallback={<FolderGlyph className={s.glyph} />} />
+              <UpBadge className="-right-1 bottom-0 size-5" iconClassName="size-3" />
+            </span>
           </div>
-          <span className="text-xs leading-tight">..</span>
+          <span className="text-xs leading-tight">...</span>
         </div>
       )}
       {p.creatingFolder && (
