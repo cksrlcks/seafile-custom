@@ -1,8 +1,21 @@
-import { IconCircleCheckFilled, IconDownload, IconExclamationCircleFilled, IconX } from "@tabler/icons-react";
-import { useEffect } from "react";
+import { IconCircleCheckFilled, IconExclamationCircleFilled, IconRocket, IconX } from "@tabler/icons-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { dismissUpdate, installUpdate, useUpdater } from "./updater";
+
+/** 새 버전 알림 맨 위 그림. 그라디언트 위에 feTurbulence 노이즈를 겹친다 */
+const NOISE = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E")`;
+const COVER = {
+  backgroundColor: "var(--primary)",
+  backgroundImage: [
+    NOISE,
+    "radial-gradient(at 15% 20%, oklch(0.85 0.12 250) 0, transparent 55%)",
+    "radial-gradient(at 85% 25%, oklch(0.72 0.17 310) 0, transparent 50%)",
+    "radial-gradient(at 60% 100%, oklch(0.82 0.13 190) 0, transparent 60%)",
+  ].join(", "),
+  backgroundBlendMode: "overlay, normal, normal, normal",
+};
 
 /** 우하단 업데이트 알림. 전송 패널과 같은 카드 모양. 새 버전·진행률·결과를 보여 준다 */
 export function UpdateNotice() {
@@ -13,24 +26,46 @@ export function UpdateNotice() {
     return () => clearTimeout(t);
   }, [s.kind]);
 
+  // 노트가 세 줄을 넘을 때만 펼치기 버튼을 보인다
+  const [open, setOpen] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const notesRef = useRef<HTMLParagraphElement>(null);
+  const notes = s.kind === "available" ? s.notes : undefined;
+  useLayoutEffect(() => {
+    const el = notesRef.current;
+    setClamped(!!el && el.scrollHeight > el.clientHeight);
+  }, [notes]);
+
   if (s.kind === "idle" || s.kind === "checking") return null;
   return (
-    <div className="w-96 rounded-xl bg-popover p-3 text-sm shadow-dialog animate-in fade-in-0 duration-100">
+    <div className="w-72 rounded-xl bg-popover p-3 text-sm shadow-dialog animate-in fade-in-0 duration-100">
       {s.kind === "available" && (
-        <div className="flex items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <IconDownload className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">새 버전 {s.version}</div>
-            <div className="truncate text-2xs text-muted-foreground">{s.notes || "업데이트하면 앱이 다시 시작됩니다"}</div>
+        <div className="flex flex-col gap-3">
+          <div className="-mx-3 -mt-3 flex h-28 items-center justify-center rounded-t-xl" style={COVER}>
+            <IconRocket className="size-10 text-white drop-shadow-md" stroke={1.5} />
           </div>
-          <Button size="sm" onClick={() => void installUpdate()}>
-            업데이트
-          </Button>
-          <Button variant="ghost" size="icon-sm" onClick={dismissUpdate} title="나중에">
-            <IconX className="size-4" />
-          </Button>
+          <div className="flex flex-col gap-1">
+            <div className="font-semibold">새로운 버전으로 업데이트</div>
+            <p
+              ref={notesRef}
+              className={`text-xs leading-relaxed whitespace-pre-line text-muted-foreground ${open ? "max-h-48 overflow-y-auto" : "line-clamp-3"}`}
+            >
+              {s.notes || "업데이트하면 앱이 다시 시작됩니다"}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            {(clamped || open) && (
+              <Button variant="link" size="xs" className="px-0 text-muted-foreground" onClick={() => setOpen(!open)}>
+                {open ? "접기" : "자세히 보기"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="ml-auto" onClick={dismissUpdate}>
+              나중에
+            </Button>
+            <Button size="sm" onClick={() => void installUpdate()}>
+              업데이트
+            </Button>
+          </div>
         </div>
       )}
       {s.kind === "downloading" && (
