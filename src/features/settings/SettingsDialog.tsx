@@ -271,11 +271,18 @@ function ClaudePage() {
         <Snippet desc="터미널에서 한 번 실행한 뒤 Claude Code를 새로 여세요" code={"claude plugin marketplace add cksrlcks/u-drive\nclaude plugin install u-drive@u-drive"} />
       </Section>
       <Section title="Claude 데스크톱 앱">
-        <Row title="확장 파일 설치" desc="u-drive.mcpb를 받은 뒤 Claude → 설정 → 확장 프로그램 화면에 끌어다 놓으면 설치됩니다. macOS는 파일을 더블클릭해도 됩니다">
+        <Row title="확장 파일 받기" desc="u-drive.mcpb 파일을 받습니다">
           <button type="button" onClick={() => openExternal(MCPB_URL)} className={btnOutline}>
             받기
           </button>
         </Row>
+        <ol className="list-decimal space-y-1.5 py-3.5 pl-5 text-sm text-muted-foreground marker:text-foreground">
+          <li>위의 받기를 눌러 u-drive.mcpb 파일을 받습니다.</li>
+          <li>Claude 데스크톱 앱에서 설정을 엽니다.</li>
+          <li>왼쪽 목록의 이 컴퓨터 아래에 있는 확장 프로그램을 누릅니다.</li>
+          <li>받은 u-drive.mcpb 파일을 확장 프로그램 화면에 끌어다 놓고, 뜨는 창에서 설치를 누릅니다.</li>
+          <li>Claude 대화에서 "유드라이브 저장소 목록 보여줘"라고 해서 목록이 나오면 연결된 것입니다.</li>
+        </ol>
       </Section>
     </>
   );

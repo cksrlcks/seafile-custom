@@ -28,7 +28,13 @@ claude plugin marketplace add cksrlcks/u-drive
 claude plugin install u-drive@u-drive
 ```
 
-**Claude 데스크톱 앱** — [u-drive.mcpb](https://github.com/cksrlcks/u-drive/raw/main/claude-plugin/u-drive.mcpb)를 받은 뒤 Claude → 설정 → 확장 프로그램 화면에 끌어다 놓으면 설치됩니다. macOS는 파일을 더블클릭해도 됩니다.
+**Claude 데스크톱 앱**
+
+1. [u-drive.mcpb](https://github.com/cksrlcks/u-drive/raw/main/claude-plugin/u-drive.mcpb)를 받습니다. U-Drive 설정 → Claude 연결의 받기 버튼도 같은 파일입니다.
+2. Claude 데스크톱 앱에서 설정을 엽니다.
+3. 왼쪽 목록의 이 컴퓨터 아래에 있는 확장 프로그램을 누릅니다.
+4. 받은 u-drive.mcpb 파일을 확장 프로그램 화면에 끌어다 놓고, 뜨는 창에서 설치를 누릅니다.
+5. Claude 대화에서 "유드라이브 저장소 목록 보여줘"라고 해서 목록이 나오면 연결된 것입니다.
 
 플러그인 파일은 [claude-plugin/](claude-plugin/)에 있습니다. `mcpb/manifest.json`을 고치면 그 폴더에서 `npx @anthropic-ai/mcpb pack . ../u-drive.mcpb`로 다시 만듭니다.
 
