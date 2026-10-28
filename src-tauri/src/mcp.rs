@@ -141,7 +141,7 @@ pub fn relay_io(input: impl BufRead, output: impl Write + Send + 'static, mut co
     let mut gens = 0u64;
     for line in input.lines() {
         let line = line?;
-        let line = line.trim_end_matches('\r');
+        let line = line.trim_start_matches('\u{feff}').trim_end_matches('\r');
         if line.is_empty() {
             continue;
         }
@@ -403,6 +403,15 @@ mod tests {
         let out = Out::default();
         relay_io(PING.as_bytes(), out.clone(), || Ok(client(port, "tok"))).unwrap();
         assert!(out.text().contains("\"result\""));
+    }
+
+    #[test]
+    fn relay_strips_bom() {
+        // .NET 등은 stdin 첫 줄 앞에 UTF-8 BOM을 붙인다. 지우지 않으면 요청으로 인식 못 해 응답을 기다리지 않고 끝난다
+        let port = answering_hub(Duration::from_millis(200));
+        let out = Out::default();
+        relay_io(format!("\u{feff}{PING}").as_bytes(), out.clone(), || Ok(client(port, "tok"))).unwrap();
+        assert!(out.text().contains("\"result\""), "{}", out.text());
     }
 
     #[test]
