@@ -175,7 +175,12 @@ export class SeafileProvider implements StorageProvider {
     const url = await this.previewUrl(libId, path);
     const res = await fetch(url);
     if (!res.ok) throw new StorageError("server", res.statusText, res.status);
-    return res.text();
+    const buf = await res.arrayBuffer();
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    } catch {
+      return new TextDecoder("euc-kr").decode(buf); // 레거시 한글 txt (CP949)
+    }
   }
   thumbnail(libId: string, path: string, size: number, signal?: AbortSignal): Promise<Blob> {
     return this.api.getBlob(`/api2/repos/${libId}/thumbnail/`, { p: path, size: String(size) }, signal);
