@@ -1,6 +1,6 @@
 # macOS 배포
 
-`v*` 태그를 푸시하면 [release.yml](../.github/workflows/release.yml)이 Windows와 macOS(universal: Apple Silicon + Intel)를 함께 빌드해 같은 GitHub Release에 올린다.
+main에서 릴리스 워크플로를 실행하면(`gh workflow run release.yml --ref main`) [release.yml](../.github/workflows/release.yml)이 Windows와 macOS(universal: Apple Silicon + Intel)를 함께 빌드해 같은 GitHub Release에 올린다.
 두 빌드가 모두 끝나야 릴리스가 공개되고, `latest.json`에 `windows-x86_64`·`darwin-aarch64`·`darwin-x86_64`가 모두 들어간다.
 
 ## 결과물
