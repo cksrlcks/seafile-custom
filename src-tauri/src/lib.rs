@@ -1,3 +1,5 @@
+pub mod mcp;
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -251,6 +253,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
         .manage(Mutex::new(Prefs { close_to_tray: true, download_dir: None }))
         .setup(|app| {
+            mcp::setup(app.handle());
             // 로그인할 때 자동 실행이면 창 없이 트레이에만 둔다
             if std::env::args().any(|a| a == "--autostart") {
                 if let Some(w) = app.get_webview_window("main") {
@@ -316,7 +319,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {
