@@ -22,6 +22,7 @@ import { useSession, useStorage } from "@/storage/StorageContext";
 import { useStoredState } from "@/lib/useStoredState";
 import { useMarquee } from "./useMarquee";
 import { useSidebarWidth } from "./useSidebarWidth";
+import { prefetchShellIcons } from "./useShellIcon";
 import { baseName, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
@@ -187,6 +188,7 @@ export function MainScreen() {
     setSelected(new Set());
   };
   useEffect(() => void checkForUpdate(), []); // 시작할 때 한 번 조용히 확인
+  useEffect(() => prefetchShellIcons(qc), [qc]);
   const openLinks = () => {
     setPage("links");
     setSelected(new Set());
