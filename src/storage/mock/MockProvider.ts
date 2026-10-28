@@ -112,8 +112,12 @@ export class MockProvider implements StorageProvider {
   async downloadUrl(_libId: string, path: string): Promise<string> {
     return `data:text/plain;charset=utf-8,${encodeURIComponent(`mock file ${path}`)}`;
   }
-  previewUrl(libId: string, path: string): Promise<string> {
-    return this.downloadUrl(libId, path);
+  async previewUrl(libId: string, path: string): Promise<string> {
+    // 이미지 뷰어 확인용: 이미지는 경로마다 다른 색의 1600×1000 그림
+    if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(path)) return this.downloadUrl(libId, path);
+    const hue = [...path].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><rect width="100%" height="100%" fill="hsl(${hue} 55% 60%)"/><circle cx="1150" cy="300" r="140" fill="hsl(${hue} 70% 85%)"/><path d="M0 1000 L500 450 L850 800 L1150 550 L1600 1000Z" fill="hsl(${hue} 45% 35%)"/></svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
   async readText(_libId: string, path: string): Promise<string> {
     return `# ${baseName(path)}\n\nmock 내용입니다.`;

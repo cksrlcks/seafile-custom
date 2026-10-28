@@ -195,6 +195,11 @@ export function MainScreen() {
 
   // ---- 키보드 ----
   const listRef = useRef<HTMLDivElement>(null);
+  // 미리보기를 닫으면 키보드 포커스를 파일 목록으로 돌려준다
+  const closePreview = () => {
+    setPreviewPath(null);
+    listRef.current?.focus();
+  };
   const marquee = useMarquee(listRef, selected, setSelected);
   function onKeyDown(e: React.KeyboardEvent) {
     if (renamingPath || creatingFolder || (e.target as HTMLElement).tagName === "INPUT") return;
@@ -366,6 +371,8 @@ export function MainScreen() {
           </>
         )}
 
+        {/* 파일 목록 + 세부 정보 창. 미리보기는 이 자리를 덮는다 */}
+        <div className="relative flex min-w-0 flex-1">
         <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {libs.error && <ErrorBanner message="저장소 목록을 불러오지 못했습니다" onRetry={() => libs.refetch()} />}
           {renameLibrary.error && <ErrorBanner message={`저장소 이름을 바꾸지 못했습니다 (${(renameLibrary.error as Error).message})`} actionLabel="닫기" onRetry={() => renameLibrary.reset()} />}
@@ -426,6 +433,10 @@ export function MainScreen() {
         {detailsOpen && page === "files" && (
           <DetailsPanel libId={loc.libId} libName={lib?.name ?? ""} folderName={crumbs[crumbs.length - 1]?.label ?? ""} entries={dir.data ?? []} selected={selectedEntries} sharedPaths={sharedPaths} />
         )}
+        {loc.libId && page === "files" && (
+          <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={closePreview} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate([e])} />
+        )}
+        </div>
         {/* 알림(새 버전·다운로드·업로드)은 세부 정보 창이 있어도 창 오른쪽 아래 가장자리에 */}
         <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
           <UpdateNotice />
@@ -441,9 +452,6 @@ export function MainScreen() {
         selectedBytes={selectedEntries.reduce((a, e) => a + e.size, 0)}
       />
 
-      {loc.libId && (
-        <PreviewModal libId={loc.libId} entries={previewable} index={previewIndex} onClose={() => setPreviewPath(null)} onNavigate={(i) => setPreviewPath(previewable[i]?.path ?? null)} onDownload={(e) => ops.download.mutate([e])} />
-      )}
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
