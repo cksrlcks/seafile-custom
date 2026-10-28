@@ -22,7 +22,7 @@ import { useSession, useStorage } from "@/storage/StorageContext";
 import { useStoredState } from "@/lib/useStoredState";
 import { useMarquee } from "./useMarquee";
 import { useSidebarWidth } from "./useSidebarWidth";
-import { joinPath, parentPath, splitPath } from "@/storage/path";
+import { baseName, joinPath, parentPath, splitPath } from "@/storage/path";
 import type { Entry, Library, UploadTask } from "@/storage/StorageProvider";
 import type { EntryMenuActions } from "./ContextMenu";
 import { DeleteDialog } from "./DeleteDialog";
@@ -32,7 +32,9 @@ import { DetailsPanel } from "./DetailsPanel";
 import { ICON_SIZES, IconGrid } from "./IconGrid";
 import { Sidebar } from "./Sidebar";
 import { useCurrentDir, useLibraries, type Location } from "./useCurrentDir";
-import { useEntryActions } from "./useEntryActions";
+import { useEntryActions, type MoveOp } from "./useEntryActions";
+import { useDragMove } from "./useDragMove";
+import { MoveNotice } from "./MoveNotice";
 
 export function MainScreen() {
   const { logout } = useSession();
@@ -157,6 +159,26 @@ export function MainScreen() {
     mutationFn: ({ libId, path, newName }: { libId: string; path: string; newName: string }) => storage.rename(libId, path, newName, "dir"),
     onSuccess: (_d, { libId, path }) => qc.invalidateQueries({ queryKey: ["dir", libId, parentPath(path)] }),
   });
+  // ---- 끌어서 옮기기: 같은 저장소 안, 지금 폴더의 하위 폴더로만. 놓은 뒤 잠시 실행 취소를 띄운다 ----
+  const [lastMove, setLastMove] = useState<MoveOp | null>(null);
+  const closeMoveNotice = useCallback(() => setLastMove(null), []);
+  const undoMove = () => {
+    if (!lastMove) return;
+    ops.move.mutate({ ...lastMove, srcDir: lastMove.dstDir, dstDir: lastMove.srcDir });
+    setLastMove(null);
+  };
+  const dirName = (path: string) => (path === "/" ? (lib?.name ?? "/") : baseName(path));
+  const dragMove = useDragMove(
+    entries,
+    selected,
+    setSelected,
+    (items, dstDir) => {
+      const op = { libId: loc.libId!, srcDir: loc.path, names: items.map((x) => x.name), dstDir };
+      ops.move.mutate(op, { onSuccess: () => setLastMove(op) });
+      setSelected(new Set());
+    },
+    readOnly,
+  );
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [deleting, setDeleting] = useState<Entry[]>([]);
@@ -233,6 +255,7 @@ export function MainScreen() {
     else if (e.key === "F5") (e.preventDefault(), void qc.invalidateQueries({ queryKey: ["dir"] }));
     else if (mod && e.shiftKey && e.key.toLowerCase() === "n" && !readOnly) (e.preventDefault(), setCreatingFolder(true));
     else if (mod && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
+    else if (mod && e.key.toLowerCase() === "z" && lastMove) (e.preventDefault(), undoMove());
   }
 
   // 아이콘 보기 Ctrl+휠: 크기 단계 조절(탐색기처럼). preventDefault가 필요해 passive가 아닌 리스너로 직접 단다
@@ -277,6 +300,9 @@ export function MainScreen() {
       ops.mkdir.mutate(name);
     },
     onCreateFolderCancel: () => setCreatingFolder(false),
+    dropTarget: dragMove.drag?.over ?? null,
+    parentDir: loc.path === "/" ? null : parentPath(loc.path),
+    onOpenParent: () => setLoc({ ...loc, path: parentPath(loc.path) }),
   };
 
   // 트레이 메뉴(Rust)에서 넘어오는 동작
@@ -406,8 +432,8 @@ export function MainScreen() {
                   ref={listRef}
                   tabIndex={0}
                   onKeyDown={onKeyDown}
-                  onPointerDown={marquee.onPointerDown}
-                  onClickCapture={marquee.onClickCapture}
+                  onPointerDown={(e) => dragMove.onPointerDown(e) || marquee.onPointerDown(e)}
+                  onClickCapture={(e) => (dragMove.onClickCapture(e), marquee.onClickCapture(e))}
                   onClick={(e) => e.target === e.currentTarget && setSelected(new Set())}
                   className="relative min-h-0 flex-1 overflow-auto outline-none"
                 />
@@ -425,6 +451,11 @@ export function MainScreen() {
                 <FileList {...listProps} />
               )}
               {marquee.rect && <div className="pointer-events-none absolute border border-primary/60 bg-primary/10" style={marquee.rect} />}
+              {dragMove.drag && (
+                <div className="pointer-events-none fixed z-50 rounded-md bg-popover px-2 py-1 text-xs shadow-dialog" style={{ left: dragMove.drag.x + 14, top: dragMove.drag.y + 14 }}>
+                  {dragMove.drag.over ? `'${dirName(dragMove.drag.over)}'(으)로 옮기기` : `${dragMove.drag.count}개 항목`}
+                </div>
+              )}
             </BackgroundContextMenu>
           </DropZone>
             </>
@@ -440,6 +471,7 @@ export function MainScreen() {
         {/* 알림(새 버전·다운로드·업로드)은 세부 정보 창이 있어도 창 오른쪽 아래 가장자리에 */}
         <div className="pointer-events-none absolute right-3 bottom-3 z-20 flex flex-col items-end gap-2 *:pointer-events-auto">
           <UpdateNotice />
+          {lastMove && <MoveNotice op={lastMove} dstName={dirName(lastMove.dstDir)} onUndo={undoMove} onClose={closeMoveNotice} />}
           <DownloadPanel />
           <UploadPanel />
         </div>

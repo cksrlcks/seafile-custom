@@ -214,4 +214,13 @@ describe("SeafileProvider share links", () => {
     expect(url).toBe("https://host.example/api/v2.1/share-links/tk/");
     expect(init.method).toBe("DELETE");
   });
+
+  it("move posts a JSON batch move within the same library", async () => {
+    fetchMock.mockResolvedValue(json({ success: true }));
+    await new SeafileProvider("https://host.example", "t").move("r", "/a", ["x.txt", "y"], "/a/b");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://host.example/api/v2.1/repos/sync-batch-move-item/");
+    expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
+    expect(JSON.parse(init.body as string)).toEqual({ src_repo_id: "r", src_parent_dir: "/a", src_dirents: ["x.txt", "y"], dst_repo_id: "r", dst_parent_dir: "/a/b" });
+  });
 });

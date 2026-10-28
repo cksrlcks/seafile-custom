@@ -189,6 +189,9 @@ export class SeafileProvider implements StorageProvider {
   async remove(libId: string, path: string, type: "file" | "dir"): Promise<void> {
     await this.api.delete(`/api2/repos/${libId}/${type}/`, { p: path });
   }
+  async move(libId: string, srcDir: string, names: string[], dstDir: string): Promise<void> {
+    await this.api.postJson("/api/v2.1/repos/sync-batch-move-item/", { src_repo_id: libId, src_parent_dir: srcDir, src_dirents: names, dst_repo_id: libId, dst_parent_dir: dstDir });
+  }
   async createShareLink(libId: string, path: string, opts?: { password?: string; expireDays?: number }): Promise<ShareLink> {
     const form: Record<string, string> = { repo_id: libId, path };
     if (opts?.password) form.password = opts.password;

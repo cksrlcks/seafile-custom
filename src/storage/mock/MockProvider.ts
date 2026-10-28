@@ -152,6 +152,24 @@ export class MockProvider implements StorageProvider {
     if (gone) this.trash.set(libId, [{ name: gone.name, type: gone.type, size: gone.size, parentDir: parent, deletedAt: Date.now() / 1000, commitId: `c${Date.now()}` }, ...(this.trash.get(libId) ?? [])]);
     this.rev++;
   }
+  async move(libId: string, srcDir: string, names: string[], dstDir: string): Promise<void> {
+    await delay(150);
+    const moving = this.get(libId, srcDir).filter((e) => names.includes(e.name));
+    this.set(libId, srcDir, this.get(libId, srcDir).filter((e) => !names.includes(e.name)));
+    this.set(libId, dstDir, [...this.get(libId, dstDir), ...moving.map((e) => ({ ...e, path: joinPath(dstDir, e.name) }))]);
+    // 옮긴 폴더 아래 목록들의 키·경로를 새 위치로
+    const rebase = (p: string, from: string, to: string) => (p === from || p.startsWith(from + "/") ? to + p.slice(from.length) : p);
+    for (const e of moving.filter((m) => m.type === "dir")) {
+      const to = joinPath(dstDir, e.name);
+      for (const [k, list] of [...this.tree.entries()]) {
+        const path = k.slice(libId.length + 1);
+        if (!k.startsWith(`${libId}:`) || rebase(path, e.path, to) === path) continue;
+        this.tree.delete(k);
+        this.set(libId, rebase(path, e.path, to), list.map((x) => ({ ...x, path: rebase(x.path, e.path, to) })));
+      }
+    }
+    this.rev++;
+  }
   async listTrash(libId: string): Promise<TrashEntry[]> {
     await delay(200);
     return [...(this.trash.get(libId) ?? [])];

@@ -26,6 +26,11 @@ export class SeafileApi {
     return this.request<T>("POST", path, query, new URLSearchParams(form), headers);
   }
 
+  /** 배열 값이 필요한 v2.1 API용 */
+  async postJson<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>("POST", path, undefined, JSON.stringify(body), { "Content-Type": "application/json" });
+  }
+
   async delete(path: string, query?: Query): Promise<void> {
     await this.request<unknown>("DELETE", path, query);
   }

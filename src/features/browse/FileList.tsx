@@ -1,4 +1,4 @@
-import { IconArrowDown, IconArrowUp, IconFile, IconFileZip, IconFileMusic, IconCode, IconLink, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconFile, IconFolderUp, IconFileZip, IconFileMusic, IconCode, IconLink, IconPhoto, IconFileSpreadsheet, IconFileText, IconMovie, IconFolder } from "@tabler/icons-react";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { formatDateLong, formatSize } from "@/lib/format";
@@ -76,6 +76,11 @@ export interface ListProps {
   creatingFolder: boolean;
   onCreateFolder(name: string): void;
   onCreateFolderCancel(): void;
+  /** 끌어 옮기는 중 지금 놓을 폴더 */
+  dropTarget?: string | null;
+  /** 하위 폴더면 맨 위 ".." 항목의 경로. 더블클릭하면 올라가고, 끌어다 놓으면 상위 폴더로 옮긴다. 선택·정렬 대상은 아니다 */
+  parentDir?: string | null;
+  onOpenParent?(): void;
 }
 
 /** 표 보기: 24px 머리글, 28px 행, 줄무늬, 전체 행 선택 */
@@ -103,6 +108,16 @@ export function FileList(p: ListProps) {
         </tr>
       </thead>
       <tbody>
+        {p.parentDir != null && (
+          <tr data-drop={p.parentDir} title="상위 폴더" onDoubleClick={p.onOpenParent} className={cn("h-8.5 cursor-default select-none", p.dropTarget === p.parentDir && "bg-primary/10 outline-2 -outline-offset-2 outline-primary")}>
+            <td className="pl-3" colSpan={4}>
+              <span className="flex items-center gap-2">
+                <IconFolderUp className="size-4 text-primary" stroke={1.75} />
+                ..
+              </span>
+            </td>
+          </tr>
+        )}
         {p.creatingFolder && (
           <tr className="h-8.5">
             <td className="pl-3" colSpan={4}>
@@ -124,16 +139,18 @@ export function FileList(p: ListProps) {
               dataPath={e.path}
               className={cn(
                 "h-8.5 cursor-default select-none",
-                i % 2 === 1 && !sel && "bg-muted/60",
+                (i + (p.parentDir != null ? 1 : 0)) % 2 === 1 && !sel && "bg-muted/60", // ".." 줄까지 이어서 줄무늬
                 sel && "bg-selection",
                 p.focusPath === e.path && "outline-1 -outline-offset-1 outline-primary/60",
+                p.dropTarget === e.path && "bg-primary/10 outline-2 -outline-offset-2 outline-primary",
               )}
               onClick={(ev) => p.onSelect(e, ev)}
               onDoubleClick={() => p.renamingPath !== e.path && p.onOpen(e)}
               onContextMenu={() => !sel && p.onSelect(e, { ctrlKey: false, metaKey: false, shiftKey: false } as React.MouseEvent)}
             >
               <td className="pl-3">
-                <span className="flex items-center gap-2">
+                {/* 아이콘·이름 부분만 끌어 옮기기 손잡이(useDragMove). 나머지 빈 곳은 드래그 선택 */}
+                <span data-drag className={cn("flex items-center gap-2", p.renamingPath !== e.path && "w-fit max-w-full")}>
                   <EntryIcon entry={e} />
                   {p.renamingPath === e.path ? (
                     <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 max-w-sm text-sm md:text-sm" />

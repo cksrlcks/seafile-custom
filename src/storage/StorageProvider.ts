@@ -126,6 +126,8 @@ export interface StorageProvider {
   mkdir(libId: string, path: string): Promise<void>;
   rename(libId: string, path: string, newName: string, type: "file" | "dir"): Promise<void>;
   remove(libId: string, path: string, type: "file" | "dir"): Promise<void>;
+  /** 같은 저장소 안에서 srcDir의 names를 dstDir로 옮긴다. 같은 이름 확인은 호출하는 쪽 몫 */
+  move(libId: string, srcDir: string, names: string[], dstDir: string): Promise<void>;
 
   createShareLink(
     libId: string,

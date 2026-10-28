@@ -1,3 +1,4 @@
+import { IconFolderUp } from "@tabler/icons-react";
 import { cn } from "cn";
 import { FolderGlyph } from "@/components/ui/folder-glyph";
 import { EntryContextMenu } from "./ContextMenu";
@@ -24,6 +25,19 @@ export function IconGrid(p: ListProps & { libId: string | null; iconSize: number
   const s = ICON_SIZES[p.iconSize] ?? ICON_SIZES[1];
   return (
     <div className="grid gap-1 p-3" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${s.cell}px,1fr))` }}>
+      {p.parentDir != null && (
+        <div
+          data-drop={p.parentDir}
+          title="상위 폴더"
+          onDoubleClick={p.onOpenParent}
+          className={cn("flex cursor-default flex-col items-center gap-1 rounded-md p-2 select-none hover:bg-accent/60", p.dropTarget === p.parentDir && "bg-primary/10 outline-2 -outline-offset-2 outline-primary")}
+        >
+          <div className={cn("flex items-center justify-center", s.box)}>
+            <IconFolderUp className={cn("text-primary", s.icon)} stroke={1.25} />
+          </div>
+          <span className="text-xs leading-tight">..</span>
+        </div>
+      )}
       {p.creatingFolder && (
         <div className="flex flex-col items-center gap-1 rounded-md p-2">
           <div className={cn("flex items-center justify-center", s.box)}>
@@ -44,6 +58,7 @@ export function IconGrid(p: ListProps & { libId: string | null; iconSize: number
               "flex cursor-default flex-col items-center gap-1 rounded-md p-2 select-none",
               sel ? "bg-selection" : "hover:bg-accent/60",
               p.focusPath === e.path && "outline-1 -outline-offset-1 outline-primary/60",
+              p.dropTarget === e.path && "bg-primary/10 outline-2 -outline-offset-2 outline-primary",
             )}
             onClick={(ev) => p.onSelect(e, ev)}
             onDoubleClick={() => p.renamingPath !== e.path && p.onOpen(e)}
@@ -53,7 +68,7 @@ export function IconGrid(p: ListProps & { libId: string | null; iconSize: number
             {p.renamingPath === e.path ? (
               <InlineName initial={e.name} existing={p.existingNames.filter((n) => n !== e.name)} onSubmit={(n) => p.onRenameSubmit(e, n)} onCancel={p.onRenameCancel} className="h-6 text-center text-xs md:text-xs" />
             ) : (
-              <span className="line-clamp-2 w-full text-center text-xs leading-tight break-all" title={e.name}>
+              <span data-drag className="line-clamp-2 w-full text-center text-xs leading-tight break-all" title={e.name}>
                 {e.name}
               </span>
             )}
@@ -68,7 +83,7 @@ export function IconGrid(p: ListProps & { libId: string | null; iconSize: number
 function GridIcon({ libId, entry, shared, s }: { libId: string | null; entry: Entry; shared: boolean; s: IconSize }) {
   const [ref, thumb] = useThumbnail(libId, entry, s.px);
   return (
-    <div ref={ref} className={cn("relative flex items-center justify-center", s.box)}>
+    <div ref={ref} data-drag className={cn("relative flex items-center justify-center", s.box)}>
       {thumb ? (
         <img src={thumb} alt="" draggable={false} className={cn("rounded-sm object-contain shadow-item", s.thumb)} />
       ) : (
