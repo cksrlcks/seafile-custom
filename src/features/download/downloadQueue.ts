@@ -1,3 +1,5 @@
+import { logError } from "@/lib/errorLog";
+
 /** 실제 저장 동작: url을 path(디스크)로 스트리밍. Tauri에서는 upload 플러그인의 download. */
 export type Saver = (url: string, path: string, onProgress: (received: number, total: number) => void) => Promise<void>;
 
@@ -84,6 +86,7 @@ export class DownloadQueue {
       const cur = this.items.find((i) => i.id === item.id)!;
       this.update(item.id, { status: "done", received: cur.total });
     } catch (e) {
+      logError("download", e);
       this.update(item.id, { status: "failed", error: (e as Error).message ?? String(e) });
     } finally {
       this.running--;

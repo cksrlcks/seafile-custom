@@ -1,9 +1,62 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, WindowEvent,
+    AppHandle, Emitter, Manager, State, WindowEvent,
 };
 use tauri_plugin_opener::OpenerExt;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// 화면 설정 중 Rust 쪽에서 쓰는 것. 프론트가 시작할 때와 바뀔 때 set_prefs로 넘긴다
+struct Prefs {
+    close_to_tray: bool,
+    download_dir: Option<PathBuf>,
+}
+
+#[tauri::command]
+fn set_prefs(state: State<Mutex<Prefs>>, close_to_tray: bool, download_dir: Option<String>) {
+    *state.lock().unwrap() = Prefs { close_to_tray, download_dir: download_dir.map(PathBuf::from) };
+}
+
+/// dir 안에서 name과 겹치지 않는 경로. 있으면 "이름 (1).확장자" 식으로 번호를 붙인다
+#[tauri::command]
+fn free_path(dir: String, name: String) -> String {
+    let dir = PathBuf::from(dir);
+    let p = std::path::Path::new(&name);
+    let (stem, ext) = (p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(), p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default());
+    let mut path = dir.join(&name);
+    let mut n = 1;
+    while path.exists() {
+        path = dir.join(format!("{stem} ({n}){ext}"));
+        n += 1;
+    }
+    path.to_string_lossy().into_owned()
+}
+
+/// 앱 로그 폴더(윈도우 %LOCALAPPDATA%\<id>\logs, 맥 ~/Library/Logs/<id>)의 drive.log
+fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("drive.log"))
+}
+
+/// 로그 한 줄 추가. 1MB를 넘으면 drive.old.log로 넘기고 새로 쓴다(최대 2MB 남음)
+#[tauri::command]
+fn append_log(app: AppHandle, line: String) -> Result<(), String> {
+    use std::io::Write;
+    let path = log_path(&app)?;
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1_000_000) {
+        let _ = std::fs::rename(&path, path.with_file_name("drive.old.log"));
+    }
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&path).map_err(|e| e.to_string())?;
+    writeln!(f, "{line}").map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_log_dir(app: AppHandle) -> Result<(), String> {
+    let path = log_path(&app)?;
+    app.opener().open_path(path.parent().unwrap().to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+}
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -173,7 +226,7 @@ mod shell_icon {
     }
 }
 
-/// 창 닫기는 트레이로 숨기기만 하므로, 실제 종료는 이 커맨드로
+/// 창 닫기가 트레이로 숨기기일 때 실제 종료는 이 커맨드로
 #[tauri::command]
 fn quit(app: AppHandle) {
     app.exit(0);
@@ -196,6 +249,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
+        .manage(Mutex::new(Prefs { close_to_tray: true, download_dir: None }))
         .setup(|app| {
             // 로그인할 때 자동 실행이면 창 없이 트레이에만 둔다
             if std::env::args().any(|a| a == "--autostart") {
@@ -233,7 +287,8 @@ pub fn run() {
                     "open" => show_main(app),
                     "quit" => app.exit(0),
                     "downloads" => {
-                        if let Ok(dir) = app.path().download_dir() {
+                        let custom = app.state::<Mutex<Prefs>>().lock().unwrap().download_dir.clone();
+                        if let Some(dir) = custom.or_else(|| app.path().download_dir().ok()) {
                             let _ = app.opener().open_path(dir.to_string_lossy(), None::<&str>);
                         }
                     }
@@ -253,11 +308,15 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                if window.state::<Mutex<Prefs>>().lock().unwrap().close_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                } else {
+                    window.app_handle().exit(0);
+                }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {

@@ -7,10 +7,12 @@ import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/features/shell/ErrorBoundary";
+import { logError } from "@/lib/errorLog";
 
 function Gate() {
   const { session, onUnauthorized } = useSession();
   const onError = (e: unknown) => {
+    logError("server", e);
     if (e instanceof StorageError && e.kind === "unauthorized") onUnauthorized();
   };
   // 세션(서버·토큰)이 바뀌면 캐시도 새로: 다른 계정의 목록이 남지 않게

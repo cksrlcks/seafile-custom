@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { getPrefs } from "@/features/settings/appPrefs";
 import { isTauri } from "@/features/shell/platform";
 import type { Entry } from "@/storage/StorageProvider";
 import { DownloadQueue, type DownloadItem, type Saver } from "./downloadQueue";
@@ -34,7 +35,8 @@ function browserDownload(url: string, name: string) {
 }
 
 /**
- * 파일 1개면 "다른 이름으로 저장", 여러 개면 폴더 선택 후 그 폴더에 같은 이름으로 받는다.
+ * 설정에 다운로드 폴더가 있으면 묻지 않고 그 폴더에 받는다(같은 이름이 있으면 번호를 붙임).
+ * 없으면 파일 1개는 "다른 이름으로 저장", 여러 개는 폴더 선택 후 그 폴더에 같은 이름으로 받는다.
  * 사용자가 대화상자를 취소하면 아무것도 하지 않는다(false 반환).
  */
 export async function downloadEntries(entries: Entry[], getUrl: (e: Entry) => Promise<string>): Promise<boolean> {
@@ -43,6 +45,15 @@ export async function downloadEntries(entries: Entry[], getUrl: (e: Entry) => Pr
 
   if (!isTauri()) {
     for (const f of files) browserDownload(await getUrl(f), f.name);
+    return true;
+  }
+
+  const fixed = getPrefs().downloadDir;
+  if (fixed) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    // ponytail: 디스크에 있는 이름만 피한다. 같은 파일을 아직 시작 전인 큐에 또 넣으면 겹칠 수 있음 — 문제 되면 큐의 path도 함께 확인
+    const targets = await Promise.all(files.map((f) => invoke<string>("free_path", { dir: fixed, name: f.name })));
+    downloads.add(files.map((f, i) => ({ name: f.name, size: f.size, url: () => getUrl(f), path: targets[i] })));
     return true;
   }
 

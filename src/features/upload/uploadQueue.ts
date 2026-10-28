@@ -1,3 +1,4 @@
+import { logError } from "@/lib/errorLog";
 import { joinPath, parentPath } from "@/storage/path";
 import { StorageError, type StorageProvider, type UploadTask } from "@/storage/StorageProvider";
 
@@ -126,7 +127,10 @@ export class UploadQueue {
         this.update(id, { status: "failed", error: "로그인이 필요합니다" });
         this.onUnauthorized?.();
       } else if (cur.attempts <= this.retries) this.update(id, { status: "queued", sent: 0 });
-      else this.update(id, { status: "failed", error: (e as Error).message });
+      else {
+        logError("upload", e);
+        this.update(id, { status: "failed", error: (e as Error).message });
+      }
     } finally {
       this.controllers.delete(id);
       this.running--;

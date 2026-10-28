@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { logError } from "@/lib/errorLog";
 
 interface State {
   error: Error | null;
@@ -10,6 +11,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   state: State = { error: null };
   static getDerivedStateFromError(error: Error): State {
     return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    logError("render", Object.assign(error, { stack: `${error.stack ?? ""}
+${info.componentStack ?? ""}` }));
   }
   render() {
     if (!this.state.error) return this.props.children;

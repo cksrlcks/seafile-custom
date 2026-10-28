@@ -7,8 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { isTauri, openExternal } from "@/features/shell/platform";
+import { openLogDir } from "@/lib/errorLog";
 import { formatSize } from "@/lib/format";
 import { useSession, useStorage } from "@/storage/StorageContext";
+import { setPrefs, useAppPrefs, type Theme } from "./appPrefs";
 import { useThumbnailPref } from "./useThumbnailPref";
 
 interface Props {
@@ -17,9 +19,9 @@ interface Props {
 }
 
 type Page = "account" | "general";
-const PAGES: { group: string; items: { id: Page; label: string; icon: ComponentType<{ className?: string }> }[] }[] = [
-  { group: "내 정보", items: [{ id: "account", label: "내 계정", icon: IconUserCircle }] },
-  { group: "앱", items: [{ id: "general", label: "일반", icon: IconSettings }] },
+const PAGES: { id: Page; label: string; icon: ComponentType<{ className?: string }> }[] = [
+  { id: "general", label: "일반", icon: IconSettings },
+  { id: "account", label: "내 계정", icon: IconUserCircle },
 ];
 const TITLE: Record<Page, string> = { account: "내 계정", general: "일반" };
 
@@ -35,27 +37,24 @@ export function SettingsDialog({ open, onClose }: Props) {
 }
 
 function Body() {
-  const [page, setPage] = useState<Page>("account");
+  const [page, setPage] = useState<Page>("general");
   return (
     <>
       <nav className="flex w-[200px] shrink-0 flex-col border-r border-border bg-surface-header">
         <DialogPrimitive.Title className="px-5 pt-5 text-base font-semibold">설정</DialogPrimitive.Title>
-        {PAGES.map((g) => (
-          <div key={g.group} className="flex flex-col gap-0.5 px-3 pt-5">
-            <span className="px-2 pb-2 text-xs text-muted-foreground">{g.group}</span>
-            {g.items.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setPage(id)}
-                className={cn("flex h-9 items-center gap-2 rounded-lg px-2.5 text-left text-base outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-primary/40", page === id && "bg-accent font-medium hover:bg-accent")}
-              >
-                <Icon className="size-[18px] text-foreground/80" />
-                {label}
-              </button>
-            ))}
-          </div>
-        ))}
+        <div className="flex flex-col gap-0.5 px-3 pt-5">
+          {PAGES.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setPage(id)}
+              className={cn("flex h-9 items-center gap-2 rounded-lg px-2.5 text-left text-base outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-primary/40", page === id && "bg-accent font-medium hover:bg-accent")}
+            >
+              <Icon className="size-[18px] text-foreground/80" />
+              {label}
+            </button>
+          ))}
+        </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-8">
@@ -97,6 +96,28 @@ function Row({ title, desc, children }: { title: string; desc?: ReactNode; child
 
 const Pill = ({ children, className }: { children: ReactNode; className?: string }) => <span className={cn("max-w-[60%] truncate rounded-full bg-muted px-2 py-1 text-xs font-semibold", className)}>{children}</span>;
 const btn = "h-8 shrink-0 rounded-[10px] border bg-card px-3 text-sm outline-none focus-visible:ring-2";
+const btnOutline = cn(btn, "border-border hover:bg-muted focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50");
+
+/** 몇 개 중 하나 고르기(테마·배율) */
+function Segmented<T extends string | number>({ label, value, options, onChange, disabled }: { label: string; value: T; options: { value: T; label: string }[]; onChange(v: T): void; disabled?: boolean }) {
+  return (
+    <div role="radiogroup" aria-label={label} className={cn("flex shrink-0 rounded-[10px] bg-muted p-0.5", disabled && "pointer-events-none opacity-50")}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={cn("h-7 rounded-[8px] px-3 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40", value === o.value && "bg-card font-medium text-foreground shadow-button-subtle")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function AccountPage() {
   const storage = useStorage();
@@ -134,7 +155,7 @@ function AccountPage() {
         </Row>
         {/* 일반 사용자용 비밀번호 변경 API가 없어서 서버 웹 설정 페이지를 브라우저로 연다 */}
         <Row title="비밀번호" desc="웹 설정 페이지에서 바꿉니다">
-          <button type="button" disabled={connection.kind === "mock"} onClick={() => openExternal(`${connection.baseUrl}/profile/`)} className={cn(btn, "border-border hover:bg-muted focus-visible:ring-primary/40 disabled:opacity-50")}>
+          <button type="button" disabled={connection.kind === "mock"} onClick={() => openExternal(`${connection.baseUrl}/profile/`)} className={btnOutline}>
             비밀번호 변경
           </button>
         </Row>
@@ -153,15 +174,24 @@ function AccountPage() {
   );
 }
 
+const THEMES: { value: Theme; label: string }[] = [
+  { value: "system", label: "시스템" },
+  { value: "light", label: "라이트" },
+  { value: "dark", label: "다크" },
+];
+const ZOOMS = [0.9, 1, 1.1, 1.25].map((v) => ({ value: v, label: `${Math.round(v * 100)}%` }));
+
 function GeneralPage() {
   // null = 아직 모름(확인 중이거나 설치된 앱이 아님)
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [thumbs, setThumbs] = useThumbnailPref();
+  const prefs = useAppPrefs();
+  const app = isTauri();
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!app) return;
     void import("@tauri-apps/plugin-autostart").then((a) => a.isEnabled()).then(setAutostart, () => setAutostart(false));
-  }, []);
+  }, [app]);
 
   async function toggle(on: boolean) {
     setError(null);
@@ -174,14 +204,45 @@ function GeneralPage() {
     }
   }
 
+  async function pickDownloadDir() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const dir = await open({ title: "다운로드 폴더", directory: true, defaultPath: prefs.downloadDir ?? undefined });
+    if (typeof dir === "string") setPrefs({ downloadDir: dir });
+  }
+
   return (
     <>
-      <Section title="시작">
+      <Section title="모양">
+        <Row title="테마" desc="시스템을 고르면 OS의 라이트·다크 설정을 따릅니다">
+          <Segmented label="테마" value={prefs.theme} options={THEMES} onChange={(theme) => setPrefs({ theme })} />
+        </Row>
+        <Row title="화면 크기" desc={app ? "글자와 화면 요소를 함께 키우거나 줄입니다" : "설치된 앱에서만 바꿀 수 있습니다"}>
+          <Segmented label="화면 크기" value={prefs.zoom} options={ZOOMS} onChange={(zoom) => setPrefs({ zoom })} disabled={!app} />
+        </Row>
+      </Section>
+      <Section title="시작 및 종료">
         <Row
           title="컴퓨터를 켜면 Drive 자동 실행"
-          desc={error ? <span className="text-destructive">{error}</span> : isTauri() ? "창 없이 트레이(메뉴 막대)에서 시작합니다" : "설치된 앱에서만 바꿀 수 있습니다"}
+          desc={error ? <span className="text-destructive">{error}</span> : app ? "창 없이 트레이(메뉴 막대)에서 시작합니다" : "설치된 앱에서만 바꿀 수 있습니다"}
         >
           <Checkbox aria-label="자동 실행" checked={!!autostart} disabled={autostart === null} onCheckedChange={(v) => void toggle(!!v)} />
+        </Row>
+        <Row title="창을 닫아도 트레이에서 계속 실행" desc={app ? "끄면 창을 닫을 때 Drive가 종료되고 진행 중인 전송도 멈춥니다" : "설치된 앱에서만 바꿀 수 있습니다"}>
+          <Checkbox aria-label="창을 닫아도 트레이에서 계속 실행" checked={prefs.closeToTray} disabled={!app} onCheckedChange={(v) => setPrefs({ closeToTray: !!v })} />
+        </Row>
+      </Section>
+      <Section title="다운로드">
+        <Row title="다운로드 위치" desc={!app ? "브라우저의 다운로드 설정을 따릅니다" : prefs.downloadDir ? <span className="break-all">{prefs.downloadDir}</span> : "받을 때마다 저장할 위치를 묻습니다"}>
+          <span className="flex shrink-0 gap-2">
+            {prefs.downloadDir && (
+              <button type="button" onClick={() => setPrefs({ downloadDir: null })} className={btnOutline}>
+                매번 묻기
+              </button>
+            )}
+            <button type="button" disabled={!app} onClick={() => void pickDownloadDir()} className={btnOutline}>
+              폴더 선택
+            </button>
+          </span>
         </Row>
       </Section>
       <Section title="보기">
@@ -189,6 +250,22 @@ function GeneralPage() {
           <Checkbox aria-label="이미지 썸네일 표시" checked={thumbs} onCheckedChange={(v) => setThumbs(!!v)} />
         </Row>
       </Section>
+      <Section title="문제 해결">
+        <LogRow />
+      </Section>
     </>
+  );
+}
+
+function LogRow() {
+  const [error, setError] = useState<string | null>(null);
+  const app = isTauri();
+  const open = () => openLogDir().then(() => setError(null), (e: unknown) => setError(`열지 못했습니다 (${e instanceof Error ? e.message : String(e)})`));
+  return (
+    <Row title="로그" desc={error ? <span className="text-destructive">{error}</span> : app ? "문제가 생기면 이 폴더의 파일을 담당자에게 보내 주세요" : "설치된 앱에서만 볼 수 있습니다"}>
+      <button type="button" disabled={!app} onClick={() => void open()} className={btnOutline}>
+        폴더 열기
+      </button>
+    </Row>
   );
 }
