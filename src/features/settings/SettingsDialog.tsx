@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IconSettings, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconPlug, IconSettings, IconUserCircle, IconX } from "@tabler/icons-react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { cn } from "cn";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,12 +18,13 @@ interface Props {
   onClose(): void;
 }
 
-type Page = "account" | "general";
+type Page = "account" | "general" | "claude";
 const PAGES: { id: Page; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "general", label: "일반", icon: IconSettings },
   { id: "account", label: "내 계정", icon: IconUserCircle },
+  { id: "claude", label: "Claude 연결", icon: IconPlug },
 ];
-const TITLE: Record<Page, string> = { account: "내 계정", general: "일반" };
+const TITLE: Record<Page, string> = { account: "내 계정", general: "일반", claude: "Claude 연결" };
 
 /** 설정: 왼쪽 탐색 + 오른쪽 항목 목록. 서버 변경은 로그아웃 후 로그인 화면에서 한다 */
 export function SettingsDialog({ open, onClose }: Props) {
@@ -67,7 +68,7 @@ function Body() {
             <span className="sr-only">닫기</span>
           </DialogPrimitive.Close>
         </header>
-        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8">{page === "account" ? <AccountPage /> : <GeneralPage />}</div>
+        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8">{page === "account" ? <AccountPage /> : page === "claude" ? <ClaudePage /> : <GeneralPage />}</div>
       </div>
     </>
   );
@@ -254,6 +255,63 @@ function GeneralPage() {
         <LogRow />
       </Section>
     </>
+  );
+}
+
+/** Claude Code·Claude 데스크톱 앱에 이 실행 파일을 MCP(--mcp)로 등록하는 방법. 등록은 사용자가 직접 한다 */
+function ClaudePage() {
+  const app = isTauri();
+  const [exe, setExe] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!app) return;
+    void import("@tauri-apps/api/core").then(({ invoke }) => invoke<string>("exe_path")).then(setExe);
+  }, [app]);
+  if (!app) return <p className="text-sm text-muted-foreground">설치된 앱에서만 쓸 수 있습니다</p>;
+
+  const openDir = () =>
+    import("@tauri-apps/api/core")
+      .then(({ invoke }) => invoke("open_claude_config_dir"))
+      .then(() => setError(null), (e: unknown) => setError(`열지 못했습니다 (${e instanceof Error ? e.message : String(e)})`));
+
+  return (
+    <>
+      <p className="mb-6 text-sm text-muted-foreground">Claude에 Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. Drive 앱이 켜져 있고 로그인돼 있어야 합니다.</p>
+      <Section title="Claude Code">
+        <Snippet desc="터미널에서 한 번 실행하세요" code={`claude mcp add --scope user drive -- "${exe}" --mcp`} />
+      </Section>
+      <Section title="Claude 데스크톱 앱">
+        <Snippet
+          desc={error ? <span className="text-destructive">{error}</span> : "claude_desktop_config.json에 붙여 넣은 뒤 Claude 데스크톱 앱을 다시 시작하세요. 이미 다른 서버가 있으면 mcpServers 안에 drive 항목만 추가하세요."}
+          code={JSON.stringify({ mcpServers: { drive: { command: exe, args: ["--mcp"] } } }, null, 2)}
+        >
+          <button type="button" onClick={() => void openDir()} className={btnOutline}>
+            설정 폴더 열기
+          </button>
+        </Snippet>
+      </Section>
+    </>
+  );
+}
+
+function Snippet({ desc, code, children }: { desc: ReactNode; code: string; children?: ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  return (
+    <div className="flex flex-col gap-3 py-3.5">
+      <span className="text-sm text-muted-foreground">{desc}</span>
+      <pre className="overflow-x-auto rounded-[10px] bg-muted px-3 py-2.5 font-mono text-xs whitespace-pre">{code}</pre>
+      <span className="flex gap-2">
+        <button type="button" onClick={() => void copy()} className={btnOutline}>
+          {copied ? "복사됨" : "복사"}
+        </button>
+        {children}
+      </span>
+    </div>
   );
 }
 
