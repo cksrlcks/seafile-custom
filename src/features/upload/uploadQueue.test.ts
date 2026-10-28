@@ -131,3 +131,11 @@ describe("UploadQueue", () => {
     expect(fn).toHaveBeenCalled();
   });
 });
+
+describe("UploadQueue.add", () => {
+  it("add returns the new item ids", () => {
+    const { provider } = fakeProvider();
+    const q = new UploadQueue(provider);
+    expect(q.add("lib", [task("a"), task("b")])).toEqual(["1", "2"]);
+  });
+});

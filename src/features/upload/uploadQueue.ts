@@ -41,9 +41,13 @@ export class UploadQueue {
     this.retries = opts.retries ?? 2;
   }
 
-  add(libId: string, tasks: UploadTask[]): void {
+  /** 새 항목 id를 돌려준다(완료를 기다릴 때 쓴다) */
+  add(libId: string, tasks: UploadTask[]): string[] {
+    const ids: string[] = [];
     for (const task of tasks) {
-      this.items.push({ id: String(++this.seq), task, libId, status: "queued", sent: 0, total: task.file.size, attempts: 0 });
+      const id = String(++this.seq);
+      ids.push(id);
+      this.items.push({ id, task, libId, status: "queued", sent: 0, total: task.file.size, attempts: 0 });
       const dirs = this.pendingDirs.get(libId) ?? new Set<string>();
       // 잎 경로부터 targetDir까지 모든 조상: 폴더 드롭 시 보고 있던 폴더와 중간 폴더도 갱신돼야 한다
       let d = task.relativePath ? joinPath(task.targetDir, task.relativePath) : task.targetDir;
@@ -56,6 +60,7 @@ export class UploadQueue {
     }
     this.emit();
     this.pump();
+    return ids;
   }
 
   retry(id: string): void {

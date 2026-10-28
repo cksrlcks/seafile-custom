@@ -35,10 +35,13 @@ export class DownloadQueue {
     private concurrency = 2,
   ) {}
 
-  add(jobs: DownloadJob[]): void {
-    for (const job of jobs) this.items.push({ id: String(++this.seq), job, status: "queued", received: 0, total: job.size });
+  /** 새 항목 id를 돌려준다(완료를 기다릴 때 쓴다) */
+  add(jobs: DownloadJob[]): string[] {
+    const ids = jobs.map(() => String(++this.seq));
+    jobs.forEach((job, i) => this.items.push({ id: ids[i], job, status: "queued", received: 0, total: job.size }));
     this.emit();
     this.pump();
+    return ids;
   }
 
   retry(id: string): void {
