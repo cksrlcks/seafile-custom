@@ -54,7 +54,7 @@ export function LoginScreen() {
       <form onSubmit={submit} className="flex w-88 flex-col gap-4 rounded-xl border border-border bg-card p-8 text-sm shadow-float">
         <div className="flex flex-col items-center gap-2 pb-2">
           <CloudMark className="size-14" />
-          <h1 className="text-xl font-semibold tracking-tight">Drive</h1>
+          <h1 className="text-xl font-semibold tracking-tight">U-Drive</h1>
           <p className="text-xs tracking-normal text-muted-foreground">저장소에 연결하려면 로그인하세요</p>
         </div>
 

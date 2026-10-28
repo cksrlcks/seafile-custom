@@ -270,11 +270,11 @@ pub fn run() {
             }
             let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
             let sep = || PredefinedMenuItem::separator(app);
-            let version = MenuItem::new(app, format!("Drive v{}", app.package_info().version), false, None::<&str>)?;
+            let version = MenuItem::new(app, format!("U-Drive v{}", app.package_info().version), false, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
                 &[
-                    &item("open", "Drive 열기")?,
+                    &item("open", "U-Drive 열기")?,
                     &sep()?,
                     &item("upload", "파일 업로드…")?,
                     &item("refresh", "새로고침")?,
@@ -291,7 +291,7 @@ pub fn run() {
                 .icon(app.default_window_icon().unwrap().clone())
                 // macOS 메뉴 막대는 흑백 템플릿 아이콘이 관례. 알파(구름 모양)만 써서 다크/라이트에 맞춰 그려진다
                 .icon_as_template(cfg!(target_os = "macos"))
-                .tooltip("Drive")
+                .tooltip("U-Drive")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, e| match e.id.as_ref() {

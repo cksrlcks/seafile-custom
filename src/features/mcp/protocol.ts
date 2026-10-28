@@ -14,7 +14,7 @@ export const INSTRUCTIONS = [
   "올릴 파일이 사용자 PC가 아니라 Claude 작업 공간(채팅에서 만든 docx·pdf 등)에 있으면, 먼저 '파일의 다운로드 버튼을 눌러 받아 주세요'라고 요청한다. 사용자가 받았다고 하면 recent_downloads로 그 파일을 찾아 upload_file로 올린다. md·txt 같은 텍스트 문서는 upload_text로 바로 올려도 된다.",
 ].join("\n");
 
-const LOGIN: ToolResult = { content: [{ type: "text", text: "Drive 앱에서 로그인해 주세요." }], isError: true };
+const LOGIN: ToolResult = { content: [{ type: "text", text: "U-Drive 앱에서 로그인해 주세요." }], isError: true };
 
 interface Request {
   id?: string | number | null;

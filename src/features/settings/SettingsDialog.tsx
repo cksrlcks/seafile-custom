@@ -223,7 +223,7 @@ function GeneralPage() {
       </Section>
       <Section title="시작 및 종료">
         <Row
-          title="컴퓨터를 켜면 Drive 자동 실행"
+          title="컴퓨터를 켜면 U-Drive 자동 실행"
           desc={error ? <span className="text-destructive">{error}</span> : app ? "창 없이 트레이(메뉴 막대)에서 시작합니다" : "설치된 앱에서만 바꿀 수 있습니다"}
         >
           <Checkbox aria-label="자동 실행" checked={!!autostart} disabled={autostart === null} onCheckedChange={(v) => void toggle(!!v)} />
@@ -270,7 +270,7 @@ function ClaudePage() {
 
   return (
     <>
-      <p className="mb-6 text-sm text-muted-foreground">Claude에 Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, Drive 앱에 로그인돼 있어야 합니다.</p>
+      <p className="mb-6 text-sm text-muted-foreground">Claude에 U-Drive를 연결하면 대화로 드라이브에 파일을 올리고 받을 수 있습니다. 연결은 한 번만 하면 되고, Drive 앱에 로그인돼 있어야 합니다.</p>
       <Section title="Claude Code">
         <ConnectRow
           title="Claude Code"

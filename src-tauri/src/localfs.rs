@@ -19,7 +19,7 @@ pub struct LocalFile {
 fn read_capped(path: &Path, cap: u64) -> Result<Vec<u8>, String> {
     let meta = std::fs::metadata(path).map_err(|_| format!("파일을 찾을 수 없습니다: {}", path.display()))?;
     if meta.len() > cap {
-        return Err("200MB가 넘는 파일은 Drive 앱에서 직접 올려 주세요".into());
+        return Err("200MB가 넘는 파일은 U-Drive 앱에서 직접 올려 주세요".into());
     }
     std::fs::read(path).map_err(|e| e.to_string())
 }

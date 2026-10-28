@@ -1,4 +1,4 @@
-//! Claude(MCP) 연결. Claude ─stdio─ `Drive --mcp`(relay) ─TCP─ 앱의 Hub ─이벤트─ WebView(JS가 MCP 처리)
+//! Claude(MCP) 연결. Claude ─stdio─ `U-Drive --mcp`(relay) ─TCP─ 앱의 Hub ─이벤트─ WebView(JS가 MCP 처리)
 
 use std::collections::HashSet;
 use std::io::{self, BufRead, BufReader, Write};
@@ -125,7 +125,7 @@ impl Hub {
         drop(p);
         let lost: Vec<(u64, String)> = self.inflight.lock().unwrap().drain().collect();
         for (conn, rid) in lost {
-            let _ = self.respond(conn, &rpc_error(&rid, "Drive 앱 화면이 다시 시작됐습니다. 다시 시도해 주세요."));
+            let _ = self.respond(conn, &rpc_error(&rid, "U-Drive 앱 화면이 다시 시작됐습니다. 다시 시도해 주세요."));
         }
     }
 }
@@ -163,7 +163,7 @@ impl<W: Write> Shared<W> {
     fn fail_pending(&self) {
         let ids: Vec<String> = self.pending.lock().unwrap().drain().collect();
         for id in ids {
-            self.emit(&rpc_error(&id, "Drive 앱과 연결이 끊겼습니다. 다시 시도해 주세요."));
+            self.emit(&rpc_error(&id, "U-Drive 앱과 연결이 끊겼습니다. 다시 시도해 주세요."));
         }
         self.cv.notify_all();
     }
@@ -214,7 +214,7 @@ pub fn relay_io(input: impl BufRead, output: impl Write + Send + 'static, mut co
                     sock = Some((conn_no, s));
                 }
                 Err(e) => {
-                    eprintln!("Drive 앱에 연결하지 못했습니다: {e}");
+                    eprintln!("U-Drive 앱에 연결하지 못했습니다: {e}");
                     sh.fail_pending();
                     continue;
                 }
@@ -268,7 +268,7 @@ fn autostart_command() -> io::Result<std::process::Command> {
     Ok(cmd)
 }
 
-/// `Drive --mcp` 진입점. 종료 코드를 돌려준다
+/// `U-Drive --mcp` 진입점. 종료 코드를 돌려준다
 pub fn relay() -> i32 {
     match relay_io(io::stdin().lock(), io::stdout(), connect_app) {
         Ok(()) => 0,

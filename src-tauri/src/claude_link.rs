@@ -1,4 +1,4 @@
-//! 설정 → Claude 연결: Claude Code·Claude 데스크톱 앱에 Drive MCP를 등록하고, 등록됐는지 확인한다
+//! 설정 → Claude 연결: Claude Code·Claude 데스크톱 앱에 U-Drive MCP를 등록하고, 등록됐는지 확인한다
 
 use serde::Serialize;
 use serde_json::{Value, json};

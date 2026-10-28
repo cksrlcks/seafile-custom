@@ -20,7 +20,7 @@ describe("handleLine", () => {
 
   it("tools/call without ctx returns login error", async () => {
     const r = await call({ id: 3, method: "tools/call", params: { name: "list_libraries", arguments: {} } });
-    expect(r.result).toEqual({ content: [{ type: "text", text: "Drive 앱에서 로그인해 주세요." }], isError: true });
+    expect(r.result).toEqual({ content: [{ type: "text", text: "U-Drive 앱에서 로그인해 주세요." }], isError: true });
   });
 
   it("notifications return null", async () => {

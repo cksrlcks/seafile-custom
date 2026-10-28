@@ -180,7 +180,7 @@ export function MenuBar(a: MenuActions) {
               업데이트 확인…
             </MenubarItem>
             <MenubarItem onClick={() => setDialog("about")} className={item}>
-              Drive 정보
+              U-Drive 정보
             </MenubarItem>
           </MenubarContent>
         </MenubarMenu>
@@ -221,7 +221,7 @@ export function MenuBar(a: MenuActions) {
       <Dialog open={dialog === "about"} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent showCloseButton className="text-sm sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Drive</DialogTitle>
+            <DialogTitle>U-Drive</DialogTitle>
             <DialogDescription>버전 {pkg.version}</DialogDescription>
           </DialogHeader>
           <p className="text-xs text-muted-foreground">

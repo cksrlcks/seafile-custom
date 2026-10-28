@@ -1,4 +1,4 @@
-# Drive
+# U-Drive
 
 [Seafile](https://www.seafile.com/) 서버에 붙는 데스크톱 파일 관리 앱입니다. Windows·macOS용으로, 웹 화면 대신 탐색기·Finder처럼 파일을 올리고 받고 정리할 수 있습니다.
 

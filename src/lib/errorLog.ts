@@ -26,7 +26,7 @@ export function openLogDir() {
 
 /** 처리되지 않은 오류를 전부 남긴다. main.tsx에서 한 번 */
 export function installErrorLog() {
-  append(`[${new Date().toISOString()}] (start) Drive v${pkg.version} · ${navigator.userAgent}`);
+  append(`[${new Date().toISOString()}] (start) U-Drive v${pkg.version} · ${navigator.userAgent}`);
   window.addEventListener("error", (e) => logError("window", e.error ?? e.message));
   window.addEventListener("unhandledrejection", (e) => logError("promise", e.reason));
 }
