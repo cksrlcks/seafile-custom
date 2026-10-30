@@ -28,7 +28,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LINE: u64 = 256 * 1024;
 /// 받기 요청 팝업 창. 화면(main.tsx)은 이 이름을 보고 팝업만 그린다
 const POPUP: &str = "nearby-offer";
-const POPUP_SIZE: (f64, f64) = (360.0, 172.0);
+const POPUP_SIZE: (f64, f64) = (360.0, 300.0);
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Person {
@@ -121,8 +121,8 @@ impl Transfer {
 }
 
 enum Answer {
-    /// Some(드라이브 폴더)면 드라이브로 받기
-    Accept(Option<serde_json::Value>),
+    /// target: Some(드라이브 폴더)면 드라이브로 받기. pc_dir: PC에 받을 폴더(없으면 다운로드 폴더)
+    Accept { target: Option<serde_json::Value>, pc_dir: Option<PathBuf> },
     Decline,
 }
 
@@ -303,14 +303,14 @@ impl Nearby {
         self.asks.lock().unwrap().remove(&id);
         let _ = app.emit("nearby-offer-closed", &id);
         self.close_popup_if_idle(app);
-        let target = match answer {
-            Some(Answer::Accept(target)) => target,
+        let (target, pc_dir) = match answer {
+            Some(Answer::Accept { target, pc_dir }) => (target, pc_dir),
             Some(Answer::Decline) => return drop(write_json(&mut w, &Reply::no("declined"))),
             None => return drop(write_json(&mut w, &Reply::no("timeout"))),
         };
-        // 드라이브로 받기: 임시 폴더에 받고 메인 창이 올린다. 화면이 읽어 올릴 수 있는 크기(READ_CAP)를 넘는 파일은 PC 다운로드 폴더에
+        // 드라이브로 받기: 임시 폴더에 받고 메인 창이 올린다. 화면이 읽어 올릴 수 있는 크기(READ_CAP)를 넘는 파일은 PC 폴더에
         let drive = target.is_some();
-        let pc = crate::download_dir(app);
+        let pc = pc_dir.or_else(|| crate::download_dir(app));
         let temp = app.path().app_cache_dir().ok().map(|d| d.join("nearby-in").join(&id));
         let big = |f: &FileMeta| f.size > crate::localfs::READ_CAP;
         let Some(dirs) = files.iter().map(|f| if drive && !big(f) { temp.clone() } else { pc.clone() }).collect::<Option<Vec<PathBuf>>>() else {
@@ -343,7 +343,7 @@ impl Nearby {
                 t.upload = upload.iter().map(|p| p.to_string_lossy().into_owned()).collect();
                 t.path = local.first().map(|p| p.to_string_lossy().into_owned());
                 if drive && !local.is_empty() {
-                    t.note = Some(format!("200MB가 넘는 파일 {}개는 PC 다운로드 폴더에 받았습니다", local.len()));
+                    t.note = Some(format!("200MB가 넘는 파일 {}개는 PC에 받았습니다", local.len()));
                 }
             }
             Err(_) if canceled => t.status = "canceled",
@@ -445,7 +445,7 @@ fn open_popup(app: &AppHandle) {
     }
     let (w, h) = POPUP_SIZE;
     let mut b = WebviewWindowBuilder::new(app, POPUP, WebviewUrl::default())
-        .title("바로 보내기")
+        .title("파일 수신")
         .inner_size(w, h)
         .resizable(false)
         .decorations(false)
@@ -752,11 +752,12 @@ pub fn nearby_offers(state: State<Arc<Nearby>>) -> Vec<Offer> {
     state.offer_list()
 }
 
-/// 받기 요청에 답한다. target(드라이브 폴더)이 있으면 드라이브로 받기: 임시로 받아 메인 창이 그 폴더에 올린다
+/// 받기 요청에 답한다. target(드라이브 폴더)이 있으면 드라이브로 받기: 임시로 받아 메인 창이 그 폴더에 올린다.
+/// pc_dir은 PC에 받을 폴더(설정에서 고른 곳). 없으면 다운로드 폴더
 #[tauri::command]
-pub fn nearby_answer(state: State<Arc<Nearby>>, id: String, accept: bool, target: Option<serde_json::Value>) {
+pub fn nearby_answer(state: State<Arc<Nearby>>, id: String, accept: bool, target: Option<serde_json::Value>, pc_dir: Option<String>) {
     if let Some((tx, _)) = state.asks.lock().unwrap().get(&id) {
-        let _ = tx.send(if accept { Answer::Accept(target) } else { Answer::Decline });
+        let _ = tx.send(if accept { Answer::Accept { target, pc_dir: pc_dir.map(PathBuf::from) } } else { Answer::Decline });
     }
 }
 

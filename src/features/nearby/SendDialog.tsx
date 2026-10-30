@@ -1,6 +1,6 @@
 import { IconDeviceDesktop, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "cn";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EntryIcon } from "@/features/browse/FileList";
@@ -39,9 +39,12 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
     const r = await open({ title: "보낼 파일", multiple: true });
     if (r) setPaths((cur) => [...new Set([...cur, ...r])]);
   }
-  // 메뉴·트레이에서 열면 파일부터 고르게 한다
+  // 메뉴·트레이에서 열면 파일부터 고르게 한다. 한 번만(개발 모드 StrictMode는 effect를 두 번 돌린다)
+  const asked = useRef(false);
   useEffect(() => {
-    if (source.kind === "local") void pick();
+    if (source.kind !== "local" || asked.current) return;
+    asked.current = true;
+    void pick();
   }, [source.kind]);
 
   function send(to: Peer) {

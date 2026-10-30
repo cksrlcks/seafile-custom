@@ -274,6 +274,11 @@ function SendPage() {
   const [picking, setPicking] = useState(false);
   const to = prefs.receiveTo;
   const fallback = libs.data && defaultReceiveLibrary(libs.data);
+  async function pickPcDir() {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const dir = await open({ title: "바로 보내기로 받을 폴더", directory: true, defaultPath: prefs.receivePcDir ?? prefs.downloadDir ?? undefined });
+    if (typeof dir === "string") setPrefs({ receivePcDir: dir });
+  }
   const isDefault = !fallback || (prefs.receiveDrive?.libId === fallback.id && prefs.receiveDrive.path === DEFAULT_RECEIVE_FOLDER);
   return (
     <>
@@ -289,7 +294,18 @@ function SendPage() {
         >
           <Segmented label="받을 위치" value={to ?? ""} options={[{ value: "pc", label: "내 PC" }, { value: "drive", label: "드라이브" }]} onChange={(v) => setPrefs({ receiveTo: v as "pc" | "drive" })} />
         </Row>
-        <Row title="PC 폴더" desc={<span className="break-all">{receiveLabel("pc", prefs)} · 일반의 다운로드 위치를 따릅니다</span>} />
+        <Row title="PC 폴더" desc={<span className="break-all">{receiveLabel("pc", prefs)}{!prefs.receivePcDir && " · 일반의 다운로드 위치를 따릅니다"}</span>}>
+          <span className="flex shrink-0 gap-2">
+            {prefs.receivePcDir && (
+              <button type="button" onClick={() => setPrefs({ receivePcDir: null })} className={btnOutline}>
+                기본값
+              </button>
+            )}
+            <button type="button" onClick={() => void pickPcDir()} className={btnOutline}>
+              폴더 선택
+            </button>
+          </span>
+        </Row>
         <Row title="드라이브 폴더" desc={<span className="break-all">{receiveLabel("drive", prefs)} · 폴더가 없으면 받을 때 만듭니다</span>}>
           <span className="flex shrink-0 gap-2">
             {!isDefault && fallback && (

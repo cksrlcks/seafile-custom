@@ -76,10 +76,12 @@ describe("드라이브로 받기", () => {
   });
 
   it("받을 위치 한 줄", () => {
-    expect(receiveLabel("pc", { downloadDir: null, receiveDrive: null })).toBe("다운로드 폴더");
-    expect(receiveLabel("pc", { downloadDir: "/Users/me/받기", receiveDrive: null })).toBe("/Users/me/받기");
-    expect(receiveLabel("drive", { downloadDir: null, receiveDrive: { libId: "d", libName: "문서", path: "/받은 파일" } })).toBe("문서/받은 파일");
-    expect(receiveLabel("drive", { downloadDir: null, receiveDrive: { libId: "d", libName: "문서", path: "/" } })).toBe("문서");
+    const none = { downloadDir: null, receivePcDir: null, receiveDrive: null };
+    expect(receiveLabel("pc", none)).toBe("다운로드 폴더");
+    expect(receiveLabel("pc", { ...none, downloadDir: "/Users/me/받기" })).toBe("/Users/me/받기");
+    expect(receiveLabel("pc", { ...none, downloadDir: "/Users/me/받기", receivePcDir: "/Users/me/수신" })).toBe("/Users/me/수신");
+    expect(receiveLabel("drive", { ...none, receiveDrive: { libId: "d", libName: "문서", path: "/받은 파일" } })).toBe("문서/받은 파일");
+    expect(receiveLabel("drive", { ...none, receiveDrive: { libId: "d", libName: "문서", path: "/" } })).toBe("문서");
   });
 
   it("같은 이름이 있으면 덮어쓰지 않고 번호를 붙여 올린 뒤 임시 파일을 지운다", async () => {

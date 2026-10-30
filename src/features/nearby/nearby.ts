@@ -129,8 +129,9 @@ export async function startNearby(me: { name: string; email: string; server: str
 }
 
 export const stopNearby = () => invoke("nearby_stop").catch((e) => logError("nearby", e));
-/** target이 있으면 드라이브의 그 폴더로 받는다 */
-export const answerOffer = (id: string, accept: boolean, target: DriveFolder | null = null) => invoke("nearby_answer", { id, accept, target }).catch((e) => logError("nearby", e));
+/** target이 있으면 드라이브의 그 폴더로 받는다. pcDir은 PC에 받을 폴더(드라이브로 받을 때 큰 파일도 여기). null이면 다운로드 폴더 */
+export const answerOffer = (id: string, accept: boolean, target: DriveFolder | null = null, pcDir: string | null = null) =>
+  invoke("nearby_answer", { id, accept, target, pcDir }).catch((e) => logError("nearby", e));
 export const openSendSettings = () => invoke("nearby_open_settings").catch((e) => logError("nearby", e));
 export const cancelTransfer = (id: string) => invoke("nearby_cancel", { id }).catch((e) => logError("nearby", e));
 
@@ -241,8 +242,8 @@ export async function uploadReceived(t: Transfer, storage: StorageProvider, queu
 }
 
 /** 받을 위치 한 줄(팝업·설정) */
-export function receiveLabel(to: "pc" | "drive", p: Pick<AppPrefs, "downloadDir" | "receiveDrive">): string {
-  if (to === "pc") return p.downloadDir ?? "다운로드 폴더";
+export function receiveLabel(to: "pc" | "drive", p: Pick<AppPrefs, "downloadDir" | "receivePcDir" | "receiveDrive">): string {
+  if (to === "pc") return p.receivePcDir ?? p.downloadDir ?? "다운로드 폴더";
   const d = p.receiveDrive;
   return d ? `${d.libName}${d.path === "/" ? "" : d.path}` : "내 저장소/받은 파일";
 }

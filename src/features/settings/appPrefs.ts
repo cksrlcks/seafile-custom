@@ -17,6 +17,8 @@ export interface AppPrefs {
   nearbyVisible: boolean;
   /** 바로 보내기로 받은 파일을 둘 곳. null이면 처음 받을 때 고른다 */
   receiveTo: "pc" | "drive" | null;
+  /** 바로 보내기로 PC에 받을 폴더. null이면 다운로드 위치(없으면 시스템 다운로드 폴더) */
+  receivePcDir: string | null;
   /** 드라이브로 받을 폴더. null이면 로그인할 때 내 첫 저장소의 '받은 파일'로 정한다(폴더는 받을 때 만든다) */
   receiveDrive: DriveFolder | null;
 }
@@ -28,7 +30,7 @@ export interface DriveFolder {
 }
 
 const KEY = "seadrive.prefs";
-const DEFAULTS: AppPrefs = { theme: "system", font: "system", zoom: 1, closeToTray: true, downloadDir: null, nearbyVisible: true, receiveTo: null, receiveDrive: null };
+const DEFAULTS: AppPrefs = { theme: "system", font: "system", zoom: 1, closeToTray: true, downloadDir: null, nearbyVisible: true, receiveTo: null, receivePcDir: null, receiveDrive: null };
 const listeners = new Set<() => void>();
 
 function load(): AppPrefs {
