@@ -285,7 +285,7 @@ pub fn run() {
                     &item("open", "U-Drive 열기")?,
                     &sep()?,
                     &item("upload", "파일 업로드…")?,
-                    &item("nearby", "근처로 보내기…")?,
+                    &item("nearby", "바로 보내기…")?,
                     &item("refresh", "새로고침")?,
                     &item("downloads", "다운로드 폴더 열기")?,
                     &sep()?,
@@ -343,7 +343,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::write_local_file, nearby::nearby_start, nearby::nearby_stop, nearby::nearby_peers, nearby::nearby_offers, nearby::nearby_send, nearby::nearby_answer, nearby::nearby_cancel])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::write_local_file, nearby::nearby_start, nearby::nearby_stop, nearby::nearby_peers, nearby::nearby_offers, nearby::nearby_send, nearby::nearby_answer, nearby::nearby_cancel, nearby::nearby_cleanup, nearby::nearby_open_settings])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {

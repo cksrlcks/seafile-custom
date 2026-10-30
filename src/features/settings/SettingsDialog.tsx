@@ -1,11 +1,15 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IconPlug, IconSettings, IconUserCircle, IconX } from "@tabler/icons-react";
+import { IconBuildingBroadcastTower, IconPlug, IconSettings, IconUserCircle, IconX } from "@tabler/icons-react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { cn } from "cn";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { DriveFolderPicker } from "@/features/nearby/DriveFolderPicker";
+import { DEFAULT_RECEIVE_FOLDER, defaultReceiveLibrary } from "@/features/nearby/NearbyRoot";
+import { receiveLabel } from "@/features/nearby/nearby";
+import { useLibraries } from "@/features/browse/useCurrentDir";
 import { isTauri, openExternal } from "@/features/shell/platform";
 import { openLogDir } from "@/lib/errorLog";
 import { formatSize } from "@/lib/format";
@@ -13,38 +17,43 @@ import { useSession, useStorage } from "@/storage/StorageContext";
 import { setPrefs, useAppPrefs, type Theme } from "./appPrefs";
 import { useThumbnailPref } from "./useThumbnailPref";
 
+export type SettingsPage = "account" | "general" | "send" | "claude";
+
 interface Props {
   open: boolean;
+  /** 열 때 보일 페이지 */
+  page?: SettingsPage;
   onClose(): void;
 }
 
-type Page = "account" | "general" | "claude";
-const PAGES: { id: Page; label: string; icon: ComponentType<{ className?: string }> }[] = [
+type Page = SettingsPage;
+const PAGES: { id: Page; label: string; icon: ComponentType<{ className?: string }>; app?: boolean }[] = [
   { id: "general", label: "일반", icon: IconSettings },
   { id: "account", label: "내 계정", icon: IconUserCircle },
+  { id: "send", label: "바로 보내기", icon: IconBuildingBroadcastTower, app: true },
   { id: "claude", label: "Claude 연결", icon: IconPlug },
 ];
-const TITLE: Record<Page, string> = { account: "내 계정", general: "일반", claude: "Claude 연결" };
+const TITLE: Record<Page, string> = { account: "내 계정", general: "일반", send: "바로 보내기", claude: "Claude 연결" };
 
 /** 설정: 왼쪽 탐색 + 오른쪽 항목 목록. 서버 변경은 로그아웃 후 로그인 화면에서 한다 */
-export function SettingsDialog({ open, onClose }: Props) {
+export function SettingsDialog({ open, page = "general", onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex h-[min(732px,calc(100vh-4rem))] w-[880px] max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-[20px] p-0 sm:max-w-[calc(100%-2rem)]">
-        {open && <Body />}
+        {open && <Body initial={page} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function Body() {
-  const [page, setPage] = useState<Page>("general");
+function Body({ initial }: { initial: Page }) {
+  const [page, setPage] = useState<Page>(initial);
   return (
     <>
       <nav className="flex w-[200px] shrink-0 flex-col border-r border-border bg-surface-header">
         <DialogPrimitive.Title className="px-5 pt-5 text-base font-semibold">설정</DialogPrimitive.Title>
         <div className="flex flex-col gap-0.5 px-3 pt-5">
-          {PAGES.map(({ id, label, icon: Icon }) => (
+          {PAGES.filter((p) => !p.app || isTauri()).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -68,7 +77,7 @@ function Body() {
             <span className="sr-only">닫기</span>
           </DialogPrimitive.Close>
         </header>
-        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8">{page === "account" ? <AccountPage /> : page === "claude" ? <ClaudePage /> : <GeneralPage />}</div>
+        <div className="flex-1 overflow-y-auto px-8 pt-6 pb-8">{page === "account" ? <AccountPage /> : page === "claude" ? <ClaudePage /> : page === "send" ? <SendPage /> : <GeneralPage />}</div>
       </div>
     </>
   );
@@ -246,11 +255,6 @@ function GeneralPage() {
           </span>
         </Row>
       </Section>
-      <Section title="근처로 보내기">
-        <Row title="근처에서 나를 찾을 수 있게" desc={app ? "같은 네트워크에서 같은 서버에 로그인한 사람에게 보이고, 서로 파일을 바로 주고받습니다" : "설치된 앱에서만 쓸 수 있습니다"}>
-          <Checkbox aria-label="근처에서 나를 찾을 수 있게" checked={prefs.nearbyVisible} disabled={!app} onCheckedChange={(v) => setPrefs({ nearbyVisible: !!v })} />
-        </Row>
-      </Section>
       <Section title="보기">
         <Row title="이미지 썸네일 표시" desc="아이콘 보기와 세부 정보 창에 적용됩니다. 끄면 파일 아이콘으로 보입니다">
           <Checkbox aria-label="이미지 썸네일 표시" checked={thumbs} onCheckedChange={(v) => setThumbs(!!v)} />
@@ -259,6 +263,55 @@ function GeneralPage() {
       <Section title="문제 해결">
         <LogRow />
       </Section>
+    </>
+  );
+}
+
+/** 바로 보내기: 찾기 켜기 · 받을 위치 · 드라이브 폴더 */
+function SendPage() {
+  const prefs = useAppPrefs();
+  const libs = useLibraries();
+  const [picking, setPicking] = useState(false);
+  const to = prefs.receiveTo;
+  const fallback = libs.data && defaultReceiveLibrary(libs.data);
+  const isDefault = !fallback || (prefs.receiveDrive?.libId === fallback.id && prefs.receiveDrive.path === DEFAULT_RECEIVE_FOLDER);
+  return (
+    <>
+      <Section title="찾기">
+        <Row title="근처에서 나를 찾을 수 있게" desc="같은 네트워크에서 같은 서버에 로그인한 사람에게 보이고, 서버를 거치지 않고 파일을 주고받습니다">
+          <Checkbox aria-label="근처에서 나를 찾을 수 있게" checked={prefs.nearbyVisible} onCheckedChange={(v) => setPrefs({ nearbyVisible: !!v })} />
+        </Row>
+      </Section>
+      <Section title="받기">
+        <Row
+          title="받을 위치"
+          desc={to === null ? "처음 파일을 받을 때 고릅니다. 받기 창에서도 바꿀 수 있습니다" : to === "pc" ? "받은 파일을 이 PC에 저장합니다" : "받은 파일을 드라이브에 올립니다. 200MB가 넘는 파일은 PC에 받습니다"}
+        >
+          <Segmented label="받을 위치" value={to ?? ""} options={[{ value: "pc", label: "내 PC" }, { value: "drive", label: "드라이브" }]} onChange={(v) => setPrefs({ receiveTo: v as "pc" | "drive" })} />
+        </Row>
+        <Row title="PC 폴더" desc={<span className="break-all">{receiveLabel("pc", prefs)} · 일반의 다운로드 위치를 따릅니다</span>} />
+        <Row title="드라이브 폴더" desc={<span className="break-all">{receiveLabel("drive", prefs)} · 폴더가 없으면 받을 때 만듭니다</span>}>
+          <span className="flex shrink-0 gap-2">
+            {!isDefault && fallback && (
+              <button type="button" onClick={() => setPrefs({ receiveDrive: { libId: fallback.id, libName: fallback.name, path: DEFAULT_RECEIVE_FOLDER } })} className={btnOutline}>
+                기본값
+              </button>
+            )}
+            <button type="button" onClick={() => setPicking(true)} className={btnOutline}>
+              폴더 선택
+            </button>
+          </span>
+        </Row>
+      </Section>
+      <DriveFolderPicker
+        open={picking}
+        initial={prefs.receiveDrive}
+        onPick={(f) => {
+          setPrefs({ receiveDrive: f });
+          setPicking(false);
+        }}
+        onClose={() => setPicking(false)}
+      />
     </>
   );
 }

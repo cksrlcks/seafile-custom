@@ -1,8 +1,12 @@
 import { useSyncExternalStore } from "react";
+import { waitSettled } from "@/features/mcp/waitSettled";
+import type { AppPrefs, DriveFolder } from "@/features/settings/appPrefs";
+import type { UploadQueue } from "@/features/upload/uploadQueue";
 import { logError } from "@/lib/errorLog";
-import type { Entry } from "@/storage/StorageProvider";
+import { splitPath } from "@/storage/path";
+import type { Entry, StorageProvider } from "@/storage/StorageProvider";
 
-/** 근처로 보내기: 같은 네트워크·같은 서버의 U-Drive끼리 파일을 직접 주고받는다. 찾기·전송은 Rust(nearby.rs) */
+/** 바로 보내기: 같은 네트워크·같은 서버의 U-Drive끼리 파일을 직접 주고받는다. 찾기·전송은 Rust(nearby.rs) */
 
 export interface Person {
   name: string;
@@ -37,8 +41,16 @@ export interface Transfer {
   total: number;
   status: TransferStatus;
   error?: string | null;
-  /** 받기 완료: 받은 첫 파일 경로 */
+  /** 받기 완료: PC에 받은 첫 파일 경로 */
   path?: string | null;
+  /** 드라이브로 받기 완료: 드라이브에 올릴 임시 파일 */
+  upload?: string[];
+  /** 드라이브로 받기: 올릴 폴더(팝업에서 답할 때 고른 곳) */
+  target?: DriveFolder | null;
+  /** 끝났지만 알려 줄 것 */
+  note?: string | null;
+  /** 드라이브로 받기: 받은 뒤 올리는 단계(화면에서만) */
+  stage?: "uploading" | "uploaded" | "upload-failed";
 }
 
 export interface NearbyState {
@@ -49,7 +61,8 @@ export interface NearbyState {
   error: string | null;
 }
 
-export const finished = (t: Transfer) => t.status === "done" || t.status === "declined" || t.status === "failed" || t.status === "canceled";
+/** 끝난 전송. 드라이브로 받기는 다 올릴 때까지 끝나지 않은 것으로 본다 */
+export const finished = (t: Transfer) => (t.status === "done" && t.stage !== "uploading") || t.status === "declined" || t.status === "failed" || t.status === "canceled";
 
 /** 같은 id면 바꾸고 없으면 뒤에 붙인다 */
 export function upsert(list: Transfer[], t: Transfer): Transfer[] {
@@ -116,7 +129,9 @@ export async function startNearby(me: { name: string; email: string; server: str
 }
 
 export const stopNearby = () => invoke("nearby_stop").catch((e) => logError("nearby", e));
-export const answerOffer = (id: string, accept: boolean) => invoke("nearby_answer", { id, accept }).catch((e) => logError("nearby", e));
+/** target이 있으면 드라이브의 그 폴더로 받는다 */
+export const answerOffer = (id: string, accept: boolean, target: DriveFolder | null = null) => invoke("nearby_answer", { id, accept, target }).catch((e) => logError("nearby", e));
+export const openSendSettings = () => invoke("nearby_open_settings").catch((e) => logError("nearby", e));
 export const cancelTransfer = (id: string) => invoke("nearby_cancel", { id }).catch((e) => logError("nearby", e));
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
@@ -173,4 +188,61 @@ export async function sendDrive(peer: Peer, entries: Entry[], getUrl: (e: Entry)
   } catch (e) {
     failLocal(key, peer, files, e);
   }
+}
+
+/** taken에 없는 이름. 있으면 "이름 (1).확장자" 식으로 번호를 붙인다(Rust create_free와 같은 규칙) */
+export function freeName(name: string, taken: Set<string>): string {
+  if (!taken.has(name)) return name;
+  const dot = name.lastIndexOf(".");
+  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+  for (let n = 1; ; n++) {
+    const next = `${stem} (${n})${ext}`;
+    if (!taken.has(next)) return next;
+  }
+}
+
+/** 드라이브 폴더를 업로드 위치로: 저장소 루트 + 상대 경로(없는 폴더는 서버가 만든다) */
+export function uploadSpot(path: string): { targetDir: string; relativePath?: string } {
+  const segs = splitPath(path);
+  return segs.length ? { targetDir: "/", relativePath: segs.join("/") } : { targetDir: "/" };
+}
+
+const uploading = new Set<string>();
+
+/**
+ * 드라이브로 받은 파일을 target 폴더에 올린다. 같은 이름이 있으면 덮어쓰지 않고 번호를 붙인다.
+ * 다 끝나면(실패해도) Rust 임시 폴더를 지운다. 메인 창의 NearbyRoot가 받기 완료 이벤트마다 부른다.
+ */
+export async function uploadReceived(t: Transfer, storage: StorageProvider, queue: UploadQueue, readLocalFile: (path: string) => Promise<File>) {
+  if (!t.target || !t.upload?.length || uploading.has(t.id)) return;
+  uploading.add(t.id);
+  const { libId, path } = t.target;
+  nearby.update({ ...t, stage: "uploading" });
+  try {
+    const existing = await storage.listDir(libId, path).catch(() => []); // 폴더가 아직 없으면 빈 목록
+    const taken = new Set(existing.map((e) => e.name));
+    const files: File[] = [];
+    for (const p of t.upload) {
+      const f = await readLocalFile(p);
+      const name = freeName(f.name, taken);
+      taken.add(name);
+      files.push(name === f.name ? f : new File([f], name, { type: f.type }));
+    }
+    const ids = queue.add(libId, files.map((file) => ({ file, ...uploadSpot(path) })));
+    const done = await waitSettled(queue, ids, (s) => s === "done" || s === "failed" || s === "cancelled");
+    nearby.update({ ...t, stage: done.every((i) => i.status === "done") ? "uploaded" : "upload-failed" });
+  } catch (e) {
+    logError("nearby", e);
+    nearby.update({ ...t, stage: "upload-failed", error: String(e) });
+  } finally {
+    uploading.delete(t.id);
+    await invoke("nearby_cleanup", { id: t.id }).catch((e) => logError("nearby", e));
+  }
+}
+
+/** 받을 위치 한 줄(팝업·설정) */
+export function receiveLabel(to: "pc" | "drive", p: Pick<AppPrefs, "downloadDir" | "receiveDrive">): string {
+  if (to === "pc") return p.downloadDir ?? "다운로드 폴더";
+  const d = p.receiveDrive;
+  return d ? `${d.libName}${d.path === "/" ? "" : d.path}` : "내 저장소/받은 파일";
 }

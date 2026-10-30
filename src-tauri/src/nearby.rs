@@ -1,4 +1,4 @@
-//! 근처로 보내기. 같은 네트워크의 U-Drive끼리 mDNS(_udrive._tcp)로 서로 찾고, 파일은 서버를 거치지 않고 TCP로 직접 보낸다.
+//! 바로 보내기. 같은 네트워크의 U-Drive끼리 mDNS(_udrive._tcp)로 서로 찾고, 파일은 서버를 거치지 않고 TCP로 직접 보낸다.
 //! 같은 Seafile 서버에 로그인한 U-Drive끼리만 서로 보인다.
 //!
 //! 전송 한 번 = TCP 연결 하나
@@ -28,7 +28,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LINE: u64 = 256 * 1024;
 /// 받기 요청 팝업 창. 화면(main.tsx)은 이 이름을 보고 팝업만 그린다
 const POPUP: &str = "nearby-offer";
-const POPUP_SIZE: (f64, f64) = (360.0, 132.0);
+const POPUP_SIZE: (f64, f64) = (360.0, 172.0);
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Person {
@@ -104,8 +104,14 @@ struct Transfer {
     /// asking(상대 답 기다림) · active · done · declined · failed · canceled
     status: &'static str,
     error: Option<String>,
-    /// 받기 완료: 받은 첫 파일 경로(폴더에서 보기용)
+    /// 받기 완료: PC에 받은 첫 파일 경로(폴더에서 보기용)
     path: Option<String>,
+    /// 드라이브로 받기 완료: 메인 창이 드라이브에 올릴 임시 파일. 다 올리면 nearby_cleanup
+    upload: Vec<String>,
+    /// 끝났지만 알려 줄 것(업로드 상한을 넘어 PC에 받은 파일 등)
+    note: Option<String>,
+    /// 드라이브로 받기: 팝업이 답할 때 고른 드라이브 폴더. 메인 창이 그대로 올린다
+    target: Option<serde_json::Value>,
 }
 
 impl Transfer {
@@ -115,7 +121,8 @@ impl Transfer {
 }
 
 enum Answer {
-    Accept,
+    /// Some(드라이브 폴더)면 드라이브로 받기
+    Accept(Option<serde_json::Value>),
     Decline,
 }
 
@@ -140,6 +147,7 @@ pub fn setup(app: &AppHandle) {
     // 지난 실행에서 드라이브 파일을 보내려고 임시로 받았다가 남은 것(nearby.ts sendDrive)
     if let Ok(dir) = app.path().app_cache_dir() {
         let _ = fs::remove_dir_all(dir.join("nearby"));
+        let _ = fs::remove_dir_all(dir.join("nearby-in"));
     }
     app.manage(Arc::new(Nearby {
         id: random_id(),
@@ -295,25 +303,30 @@ impl Nearby {
         self.asks.lock().unwrap().remove(&id);
         let _ = app.emit("nearby-offer-closed", &id);
         self.close_popup_if_idle(app);
-        match answer {
-            Some(Answer::Accept) => {}
+        let target = match answer {
+            Some(Answer::Accept(target)) => target,
             Some(Answer::Decline) => return drop(write_json(&mut w, &Reply::no("declined"))),
             None => return drop(write_json(&mut w, &Reply::no("timeout"))),
-        }
-        let Some(dir) = crate::download_dir(app) else {
+        };
+        // 드라이브로 받기: 임시 폴더에 받고 메인 창이 올린다. 화면이 읽어 올릴 수 있는 크기(READ_CAP)를 넘는 파일은 PC 다운로드 폴더에
+        let drive = target.is_some();
+        let pc = crate::download_dir(app);
+        let temp = app.path().app_cache_dir().ok().map(|d| d.join("nearby-in").join(&id));
+        let big = |f: &FileMeta| f.size > crate::localfs::READ_CAP;
+        let Some(dirs) = files.iter().map(|f| if drive && !big(f) { temp.clone() } else { pc.clone() }).collect::<Option<Vec<PathBuf>>>() else {
             return drop(write_json(&mut w, &Reply::no("disk")));
         };
         if write_json(&mut w, &Reply { ok: true, ..Default::default() }).is_err() {
             return;
         }
 
-        let mut t = Transfer { id: id.clone(), send: false, peer: header.from.name.clone(), name: files[0].name.clone(), count: files.len(), done: 0, total, status: "active", error: None, path: None };
+        let mut t = Transfer { id: id.clone(), send: false, peer: header.from.name.clone(), name: files[0].name.clone(), count: files.len(), done: 0, total, status: "active", error: None, path: None, upload: vec![], note: None, target };
         t.emit(app);
         if let Ok(c) = w.try_clone() {
             self.conns.lock().unwrap().insert(id.clone(), c);
         }
         let mut tick = Ticker::default();
-        let result = recv_files(&mut r, &dir, &files, |done| {
+        let result = recv_files(&mut r, &files, &dirs, |done| {
             if tick.due() {
                 Transfer { done, ..t.clone() }.emit(app);
             }
@@ -325,7 +338,13 @@ impl Nearby {
                 let _ = write_json(&mut w, &Reply { ok: true, done: true, ..Default::default() });
                 t.done = total;
                 t.status = "done";
-                t.path = paths.first().map(|p| p.to_string_lossy().into_owned());
+                let in_temp = |p: &PathBuf| temp.as_ref().is_some_and(|d| p.starts_with(d));
+                let (upload, local): (Vec<&PathBuf>, Vec<&PathBuf>) = paths.iter().partition(|p| in_temp(p));
+                t.upload = upload.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+                t.path = local.first().map(|p| p.to_string_lossy().into_owned());
+                if drive && !local.is_empty() {
+                    t.note = Some(format!("200MB가 넘는 파일 {}개는 PC 다운로드 폴더에 받았습니다", local.len()));
+                }
             }
             Err(_) if canceled => t.status = "canceled",
             Err(e) => {
@@ -333,12 +352,18 @@ impl Nearby {
                 t.error = Some(io_message(&e));
             }
         }
+        // 못 받았으면 드라이브에 올릴 것도 없다
+        if t.status != "done" {
+            if let Some(d) = &temp {
+                let _ = fs::remove_dir_all(d);
+            }
+        }
         t.emit(app);
     }
 
     fn send(&self, app: &AppHandle, id: String, peer: Peer, me: Me, files: Vec<(PathBuf, FileMeta)>, temp: bool) {
         let total = files.iter().map(|(_, f)| f.size).sum();
-        let mut t = Transfer { id: id.clone(), send: true, peer: peer.person.name.clone(), name: files[0].1.name.clone(), count: files.len(), done: 0, total, status: "asking", error: None, path: None };
+        let mut t = Transfer { id: id.clone(), send: true, peer: peer.person.name.clone(), name: files[0].1.name.clone(), count: files.len(), done: 0, total, status: "asking", error: None, path: None, upload: vec![], note: None, target: None };
         t.emit(app);
         let header = Header { v: VERSION, server: me.server, from: me.person, files: files.iter().map(|(_, f)| f.clone()).collect() };
         let mut tick = Ticker::default();
@@ -420,7 +445,7 @@ fn open_popup(app: &AppHandle) {
     }
     let (w, h) = POPUP_SIZE;
     let mut b = WebviewWindowBuilder::new(app, POPUP, WebviewUrl::default())
-        .title("근처로 보내기")
+        .title("바로 보내기")
         .inner_size(w, h)
         .resizable(false)
         .decorations(false)
@@ -490,12 +515,12 @@ fn create_free(dir: &Path, name: &str) -> io::Result<(File, PathBuf)> {
     unreachable!()
 }
 
-/// 파일 목록 순서대로 이어 온 바이트를 dir에 저장한다. 실패하면 받던 파일만 지우고, 다 받은 파일은 남긴다
-fn recv_files(r: &mut impl Read, dir: &Path, files: &[FileMeta], mut progress: impl FnMut(u64)) -> io::Result<Vec<PathBuf>> {
-    fs::create_dir_all(dir)?;
+/// 파일 목록 순서대로 이어 온 바이트를 저장한다(files[i]는 dirs[i]에). 실패하면 받던 파일만 지우고, 다 받은 파일은 남긴다
+fn recv_files(r: &mut impl Read, files: &[FileMeta], dirs: &[PathBuf], mut progress: impl FnMut(u64)) -> io::Result<Vec<PathBuf>> {
     let mut saved = Vec::new();
     let mut got = 0;
-    for f in files {
+    for (f, dir) in files.iter().zip(dirs) {
+        fs::create_dir_all(dir)?;
         let (mut out, path) = create_free(dir, &f.name)?;
         let res = copy_exact(r, &mut out, f.size, |n| {
             got += n;
@@ -630,7 +655,7 @@ fn refused_message(reason: &str) -> &'static str {
         "declined" => "상대가 거절했습니다",
         "timeout" => "상대가 응답하지 않았습니다",
         "server" => "다른 서버에 로그인한 사용자입니다",
-        "off" => "상대가 근처로 보내기를 끄고 있습니다",
+        "off" => "상대가 바로 보내기를 끄고 있습니다",
         "version" => "상대 U-Drive 버전이 맞지 않습니다. 둘 다 업데이트해 주세요",
         "disk" => "상대 PC에 저장할 폴더가 없습니다",
         _ => "전송이 중단됐습니다",
@@ -702,7 +727,7 @@ pub struct SendFile {
 /// 파일을 보낸다. 진행은 nearby-transfer 이벤트로. temp면 끝난 뒤 파일을 지운다(드라이브에서 임시로 받은 파일)
 #[tauri::command]
 pub fn nearby_send(app: AppHandle, state: State<Arc<Nearby>>, peer: String, files: Vec<SendFile>, temp: bool) -> Result<String, String> {
-    let me = state.me.lock().unwrap().clone().ok_or("근처로 보내기가 꺼져 있습니다")?;
+    let me = state.me.lock().unwrap().clone().ok_or("바로 보내기가 꺼져 있습니다")?;
     let peer = state.peers.lock().unwrap().get(&peer).cloned().ok_or("상대가 목록에서 사라졌습니다")?;
     if files.is_empty() {
         return Err("보낼 파일이 없습니다".into());
@@ -727,11 +752,30 @@ pub fn nearby_offers(state: State<Arc<Nearby>>) -> Vec<Offer> {
     state.offer_list()
 }
 
+/// 받기 요청에 답한다. target(드라이브 폴더)이 있으면 드라이브로 받기: 임시로 받아 메인 창이 그 폴더에 올린다
 #[tauri::command]
-pub fn nearby_answer(state: State<Arc<Nearby>>, id: String, accept: bool) {
+pub fn nearby_answer(state: State<Arc<Nearby>>, id: String, accept: bool, target: Option<serde_json::Value>) {
     if let Some((tx, _)) = state.asks.lock().unwrap().get(&id) {
-        let _ = tx.send(if accept { Answer::Accept } else { Answer::Decline });
+        let _ = tx.send(if accept { Answer::Accept(target) } else { Answer::Decline });
     }
+}
+
+/// 드라이브로 받은 임시 파일을 다 올렸다(또는 포기했다): 지운다
+#[tauri::command]
+pub fn nearby_cleanup(app: AppHandle, id: String) {
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return;
+    }
+    if let Ok(dir) = app.path().app_cache_dir() {
+        let _ = fs::remove_dir_all(dir.join("nearby-in").join(id));
+    }
+}
+
+/// 팝업의 "폴더 바꾸기": 메인 창을 띄워 설정의 바로 보내기 페이지를 연다
+#[tauri::command]
+pub fn nearby_open_settings(app: AppHandle) {
+    crate::show_main(&app);
+    let _ = app.emit("tray", "send-settings");
 }
 
 #[tauri::command]
@@ -806,7 +850,8 @@ mod tests {
                 return vec![];
             }
             write_json(&mut w, &Reply { ok: true, ..Default::default() }).unwrap();
-            let saved = recv_files(&mut r, &dir, &files, |_| {}).unwrap();
+            let dirs = vec![dir.clone(); files.len()];
+            let saved = recv_files(&mut r, &files, &dirs, |_| {}).unwrap();
             write_json(&mut w, &Reply { ok: true, done: true, ..Default::default() }).unwrap();
             saved
         });
@@ -860,11 +905,24 @@ mod tests {
         let dst = tmp("partial");
         let files = vec![FileMeta { name: "a.txt".into(), size: 1 }, FileMeta { name: "b.txt".into(), size: 10 }];
         let mut r: &[u8] = b"Abcd"; // b.txt는 3바이트만 오고 끊김
-        let err = recv_files(&mut r, &dst, &files, |_| {}).unwrap_err();
+        let err = recv_files(&mut r, &files, &[dst.clone(), dst.clone()], |_| {}).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
         assert_eq!(fs::read(dst.join("a.txt")).unwrap(), b"A");
         assert!(!dst.join("b.txt").exists());
         fs::remove_dir_all(dst).unwrap();
+    }
+
+    /// 드라이브로 받기: 작은 파일은 임시 폴더, 큰 파일은 PC 폴더처럼 파일마다 다른 곳에 저장한다
+    #[test]
+    fn recv_files_saves_each_file_to_its_dir() {
+        let (temp, pc) = (tmp("temp"), tmp("pc"));
+        let files = vec![FileMeta { name: "작은.txt".into(), size: 2 }, FileMeta { name: "큰.bin".into(), size: 3 }];
+        let mut r: &[u8] = b"hiBIG";
+        let saved = recv_files(&mut r, &files, &[temp.clone(), pc.clone()], |_| {}).unwrap();
+        assert_eq!(saved, vec![temp.join("작은.txt"), pc.join("큰.bin")]);
+        assert_eq!(fs::read(&saved[1]).unwrap(), b"BIG");
+        fs::remove_dir_all(temp).unwrap();
+        fs::remove_dir_all(pc).unwrap();
     }
 
     #[test]

@@ -9,7 +9,7 @@ import "./index.css";
 
 // 맥 전용 스타일 보정(index.css의 mac: 변형)
 if (isMac()) document.documentElement.dataset.os = "mac";
-// 근처로 보내기 받기 요청 팝업(Rust nearby.rs가 띄우는 작은 창)이면 그 화면만 그린다
+// 바로 보내기 받기 요청 팝업(Rust nearby.rs가 띄우는 작은 창)이면 그 화면만 그린다
 const popup = isTauri() && (window as { __TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } } }).__TAURI_INTERNALS__?.metadata?.currentWindow?.label === "nearby-offer";
 if (!popup) installErrorLog();
 if (popup) initPopupPrefs();

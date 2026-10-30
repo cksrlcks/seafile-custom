@@ -5,7 +5,7 @@ import { PreviewModal } from "@/features/preview/PreviewModal";
 import { previewKind } from "@/features/preview/previewKind";
 import { ShareDialog } from "@/features/share/ShareDialog";
 import { ShareLinksPage } from "@/features/share/ShareLinksPage";
-import { SettingsDialog } from "@/features/settings/SettingsDialog";
+import { SettingsDialog, type SettingsPage } from "@/features/settings/SettingsDialog";
 import { TrashPage } from "@/features/trash/TrashPage";
 import { checkForUpdate } from "@/features/shell/updater";
 import { UpdateNotice } from "@/features/shell/UpdateNotice";
@@ -190,6 +190,11 @@ export function MainScreen() {
     else setNearbySend({ kind: "local" });
   };
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
+  const openSettings = (page: SettingsPage = "general") => {
+    setSettingsPage(page);
+    setSettingsOpen(true);
+  };
   /** 메인 영역: 파일 탐색 · 공유 링크 · 휴지통 페이지. 어디로든 이동하면 파일 탐색으로 돌아온다 */
   const [page, setPage] = useState<"files" | "links" | "trash">("files");
   const openTrash = () => {
@@ -262,7 +267,7 @@ export function MainScreen() {
     else if (e.altKey && e.key === "ArrowRight") (e.preventDefault(), go(1));
     else if (e.key === "F5") (e.preventDefault(), void qc.invalidateQueries({ queryKey: ["dir"] }));
     else if (mod && e.shiftKey && e.key.toLowerCase() === "n" && !readOnly) (e.preventDefault(), setCreatingFolder(true));
-    else if (mod && e.key === ",") (e.preventDefault(), setSettingsOpen(true));
+    else if (mod && e.key === ",") (e.preventDefault(), openSettings());
     else if (mod && e.key.toLowerCase() === "z" && lastMove) (e.preventDefault(), undoMove());
   }
 
@@ -319,7 +324,8 @@ export function MainScreen() {
     const actions: Record<string, () => void> = {
       upload: () => dropRef.current?.open(),
       refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
-      settings: () => setSettingsOpen(true),
+      settings: () => openSettings(),
+      "send-settings": () => openSettings("send"),
       nearby: () => setNearbySend({ kind: "local" }),
       logout,
     };
@@ -357,7 +363,7 @@ export function MainScreen() {
           canForward,
           canUp: loc.libId !== null && loc.path !== "/",
           logout,
-          settings: () => setSettingsOpen(true),
+          settings: () => openSettings(),
           trash: openTrash,
           shareLinks: openLinks,
           nearby: isTauri() ? () => sendNearby() : undefined,
@@ -384,6 +390,7 @@ export function MainScreen() {
               onTrash={openTrash}
               page={page}
               onShareLinks={openLinks}
+              onSend={isTauri() ? () => sendNearby() : undefined}
               libraries={libs.data}
               loc={loc}
               onNavigate={setLoc}
@@ -486,7 +493,7 @@ export function MainScreen() {
 
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
       <SendDialog source={nearbySend} onClose={() => setNearbySend(null)} />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} page={settingsPage} onClose={() => setSettingsOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog
         entries={deleting}

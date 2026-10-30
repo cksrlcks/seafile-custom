@@ -3,7 +3,7 @@
 use serde::Serialize;
 use std::path::Path;
 
-const READ_CAP: u64 = 200 * 1024 * 1024;
+pub(crate) const READ_CAP: u64 = 200 * 1024 * 1024;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
