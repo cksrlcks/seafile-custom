@@ -14,6 +14,8 @@ const popup = isTauri() && (window as { __TAURI_INTERNALS__?: { metadata?: { cur
 if (!popup) installErrorLog();
 if (popup) initPopupPrefs();
 else initPrefs();
+// 맥 팝업 창은 투명하다(nearby.rs). 바탕을 비워 OfferPopup의 둥근 상자만 보이게
+if (popup && isMac()) document.documentElement.style.background = document.body.style.background = "transparent";
 
 // 배포판 앱에서는 WebView 기본 우클릭 메뉴(새로고침·검사 등)를 막는다. 입력칸은 복사·붙여넣기 메뉴를 남긴다.
 // 개발 중에는 검사 도구를 쓰도록 그대로 둔다

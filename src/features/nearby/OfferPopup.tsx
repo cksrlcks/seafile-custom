@@ -1,4 +1,4 @@
-import { IconBuildingBroadcastTower, IconChevronDown, IconCloud, IconDeviceDesktop, IconDeviceLaptop } from "@tabler/icons-react";
+import { IconBuildingBroadcastTower, IconChevronDown, IconCloud, IconDeviceDesktop } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -31,7 +31,7 @@ export function OfferPopup() {
   }, []);
 
   const offer = offers[0];
-  if (!offer) return <div className="h-screen bg-popover" />;
+  if (!offer) return null;
   return <Card key={offer.id} offer={offer} waiting={offers.length - 1} />;
 }
 
@@ -47,7 +47,8 @@ function Card({ offer, waiting }: { offer: Offer; waiting: number }) {
   const accept = () => void answerOffer(offer.id, true, to === "drive" ? prefs.receiveDrive : null, prefs.receivePcDir);
 
   return (
-    <div className="flex h-screen cursor-default flex-col border border-border bg-popover text-sm text-popover-foreground select-none">
+    // 맥은 투명한 창 위에 둥근 상자로(창 그림자는 OS가 이 모양을 따라 그린다)
+    <div className="flex h-screen cursor-default flex-col overflow-hidden border border-border bg-popover text-sm text-popover-foreground select-none mac:rounded-[12px]">
       <Cover left={left} />
       <div className="flex min-h-0 flex-1 flex-col px-4 pt-3">
         {/* 누가 무엇을 */}
@@ -102,15 +103,12 @@ function Destination() {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top">
         <DropdownMenuRadioGroup value={to ?? ""} onValueChange={(v) => setPrefs({ receiveTo: v as "pc" | "drive" })}>
-          <DropdownMenuRadioItem value="pc" className="text-sm">
-            <span className="flex min-w-0 flex-col">
-              내 PC<span className="truncate text-2xs opacity-70">{receiveLabel("pc", prefs)}</span>
-            </span>
+          {/* 메뉴 항목은 한 줄 높이라 경로는 넣지 않는다(고르면 버튼에 보인다). 고르면 바로 닫는다 */}
+          <DropdownMenuRadioItem value="pc" closeOnClick title={receiveLabel("pc", prefs)} className="text-sm">
+            <IconDeviceDesktop stroke={1.75} /> 내 PC
           </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="drive" disabled={!prefs.receiveDrive} className="text-sm">
-            <span className="flex min-w-0 flex-col">
-              드라이브<span className="truncate text-2xs opacity-70">{receiveLabel("drive", prefs)}</span>
-            </span>
+          <DropdownMenuRadioItem value="drive" closeOnClick disabled={!prefs.receiveDrive} title={receiveLabel("drive", prefs)} className="text-sm">
+            <IconCloud stroke={1.75} /> 드라이브
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
@@ -122,16 +120,18 @@ function Destination() {
   );
 }
 
-/** 맨 위 그림: 보낸 PC ··· 송신탑 ··· 내 PC. 새 버전 알림과 같은 배경 */
+/** 맨 위 그림: 모니터 ··· 송수신탑 ··· 모니터. 새 버전 알림과 같은 배경. 팝업 테두리에서 2px 안쪽, 모서리는 살짝 둥글게(맥은 바깥 12px와 맞춰 10px) */
 function Cover({ left }: { left: number }) {
   return (
-    <div className="relative flex h-28 shrink-0 items-center justify-center gap-3.5 text-white" style={COVER}>
-      <span className="absolute top-2 right-2.5 text-2xs text-white/85 tabular-nums">{left}초</span>
-      <IconDeviceLaptop className="size-9 drop-shadow-md" stroke={1.5} />
-      <Dots />
-      <IconBuildingBroadcastTower className="size-12 drop-shadow-md" stroke={1.4} />
-      <Dots />
-      <IconDeviceDesktop className="size-9 drop-shadow-md" stroke={1.5} />
+    <div className="shrink-0 p-0.5">
+      <div className="relative flex h-28 items-center justify-center gap-3.5 rounded-[6px] text-white mac:rounded-[10px]" style={COVER}>
+        <span className="absolute top-2 right-2.5 text-2xs text-white/85 tabular-nums">{left}초</span>
+        <IconDeviceDesktop className="size-9 drop-shadow-md" stroke={1.5} />
+        <Dots />
+        <IconBuildingBroadcastTower className="size-12 drop-shadow-md" stroke={1.4} />
+        <Dots />
+        <IconDeviceDesktop className="size-9 drop-shadow-md" stroke={1.5} />
+      </div>
     </div>
   );
 }

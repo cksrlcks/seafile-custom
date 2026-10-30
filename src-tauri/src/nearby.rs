@@ -28,7 +28,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LINE: u64 = 256 * 1024;
 /// 받기 요청 팝업 창. 화면(main.tsx)은 이 이름을 보고 팝업만 그린다
 const POPUP: &str = "nearby-offer";
-const POPUP_SIZE: (f64, f64) = (360.0, 310.0);
+const POPUP_SIZE: (f64, f64) = (360.0, 314.0);
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Person {
@@ -454,10 +454,10 @@ fn open_popup(app: &AppHandle) {
         .visible_on_all_workspaces(true)
         .skip_taskbar(true)
         .focused(false);
-    // 맥: 비활성 앱의 창이라도 첫 클릭이 바로 버튼에 닿게
+    // 맥: 비활성 앱의 창이라도 첫 클릭이 바로 버튼에 닿게. 창을 투명하게 두고 화면이 둥근 상자를 그린다(불투명 창은 각진 사각형)
     #[cfg(target_os = "macos")]
     {
-        b = b.accept_first_mouse(true);
+        b = b.accept_first_mouse(true).transparent(true);
     }
     // 마우스가 있는 화면(못 찾으면 주 화면)의 작업 영역 오른쪽 아래
     let monitor = app.cursor_position().ok().and_then(|p| app.monitor_from_point(p.x, p.y).ok().flatten()).or_else(|| app.primary_monitor().ok().flatten());

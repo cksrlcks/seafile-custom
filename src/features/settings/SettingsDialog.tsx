@@ -294,7 +294,7 @@ function SendPage() {
         >
           <Segmented label="받을 위치" value={to ?? ""} options={[{ value: "pc", label: "내 PC" }, { value: "drive", label: "드라이브" }]} onChange={(v) => setPrefs({ receiveTo: v as "pc" | "drive" })} />
         </Row>
-        <Row title="PC 폴더" desc={<span className="break-all">{receiveLabel("pc", prefs)}{!prefs.receivePcDir && " · 일반의 다운로드 위치를 따릅니다"}</span>}>
+        <Row title="PC 폴더" desc={<span className="break-all">{prefs.receivePcDir ?? (prefs.downloadDir ? `기본 폴더는 다운로드 위치(${prefs.downloadDir})입니다` : "기본 폴더는 다운로드 폴더입니다")}</span>}>
           <span className="flex shrink-0 gap-2">
             {prefs.receivePcDir && (
               <button type="button" onClick={() => setPrefs({ receivePcDir: null })} className={btnOutline}>
