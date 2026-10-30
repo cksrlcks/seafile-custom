@@ -17,6 +17,7 @@ function makeCtx(over: Partial<ToolCtx> = {}): ToolCtx {
     workDir: async () => "C:/Downloads/U-Drive 작업",
     recentFiles: async () => [],
     writeLocalFile: async () => {},
+    realPath: async (p) => p,
     ...over,
   };
 }
@@ -113,6 +114,28 @@ describe("callTool", () => {
     const conflict = parse(await callTool("upload_base64", { name: "README.md", ...HELLO, library: "docs", dir: "/" }, ctx));
     expect(conflict).toMatchObject({ uploaded: [], conflicts: ["README.md"] });
     expect(saved).toEqual([]);
+  });
+
+  it("upload_file refuses hidden and system paths, including through a link", async () => {
+    const secret = await callTool("upload_file", { local_paths: ["/Users/kim/.ssh/id_rsa"], library: "docs", dir: "/" }, makeCtx());
+    expect(secret.isError).toBe(true);
+    expect(txt(secret)).toContain("숨김");
+    const linked = makeCtx({ realPath: async (p) => (p === "/Users/kim/work/key" ? "/Users/kim/.ssh/id_rsa" : p) });
+    const viaLink = await callTool("upload_file", { local_paths: ["/Users/kim/work/key"], library: "docs", dir: "/" }, linked);
+    expect(viaLink.isError).toBe(true);
+  });
+
+  it("download refuses to write into startup folders", async () => {
+    const r = await callTool("download", { library: "docs", paths: ["/README.md"], local_dir: "/Users/kim/Library/LaunchAgents" }, makeCtx());
+    expect(r.isError).toBe(true);
+    expect(txt(r)).toContain("설정");
+  });
+
+  it("upload_base64 keeps only the file name", async () => {
+    const saved: string[] = [];
+    const ctx = makeCtx({ writeLocalFile: async (p) => void saved.push(p) });
+    await callTool("upload_base64", { name: "../../Library/LaunchAgents/x.plist", ...HELLO, library: "docs", dir: "/보고" }, ctx);
+    expect(saved).toEqual(["C:/Downloads/x.plist"]);
   });
 
   it("upload_file stops entirely on any conflict", async () => {

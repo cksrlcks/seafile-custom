@@ -2,11 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { UploadQueue } from "@/features/upload/uploadQueue";
 import { MockProvider } from "@/storage/mock/MockProvider";
-import { finished, freeName, nearby, NearbyStore, receiveLabel, uploadReceived, uploadSpot, upsert, type Transfer } from "./nearby";
+import { finished, freeName, nearby, NearbyStore, receiveLabel, serverReachable, uploadReceived, uploadSpot, upsert, type Transfer } from "./nearby";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
 
 const t = (id: string, status: Transfer["status"], done = 0): Transfer => ({ id, send: true, peer: "가", name: "a.txt", count: 1, done, total: 10, status });
+
+describe("serverReachable", () => {
+  it("서버에 닿으면(불투명 응답이라도) true, 연결·인증서 오류면 false", async () => {
+    const ok = vi.fn(async () => new Response(null));
+    expect(await serverReachable("https://drive.example", 1000, ok as unknown as typeof fetch)).toBe(true);
+    expect(ok).toHaveBeenCalledWith("https://drive.example/api2/ping/", expect.objectContaining({ mode: "no-cors" }));
+    const fail = vi.fn(async () => Promise.reject(new TypeError("Load failed")));
+    expect(await serverReachable("https://drive.example", 1000, fail as unknown as typeof fetch)).toBe(false);
+  });
+});
 
 describe("upsert", () => {
   it("같은 id는 제자리에서 바꾸고 새 id는 뒤에 붙인다", () => {

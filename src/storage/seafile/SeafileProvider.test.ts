@@ -20,6 +20,30 @@ describe("SeafileProvider", () => {
     expect(url).toBe("https://host.example/api2/auth-token/");
   });
 
+  it("login with device info asks for a per-device token", async () => {
+    fetchMock.mockResolvedValue(json({ token: "t2" }));
+    const p = new SeafileProvider("https://host.example", null);
+    await p.login("me", "pw", undefined, { platform: "mac", deviceId: "d".repeat(32), deviceName: "내 맥북", clientVersion: "0.10.2" });
+    const body = new URLSearchParams(String(fetchMock.mock.calls[0][1].body));
+    expect(Object.fromEntries(body)).toEqual({ username: "me", password: "pw", platform: "mac", device_id: "d".repeat(32), device_name: "내 맥북", client_version: "0.10.2" });
+    expect(p.token).toBe("t2");
+  });
+
+  it("logout revokes the token on the server and still logs out when that fails", async () => {
+    fetchMock.mockResolvedValue(json({}));
+    const p = new SeafileProvider("https://host.example", "t");
+    await p.logout();
+    expect(fetchMock.mock.calls[0][0]).toBe("https://host.example/api2/logout-device/");
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get("Authorization")).toBe("Token t");
+    expect(p.isLoggedIn()).toBe(false);
+
+    fetchMock.mockRejectedValue(new TypeError("offline"));
+    const q = new SeafileProvider("https://host.example", "t");
+    await q.logout();
+    expect(q.isLoggedIn()).toBe(false);
+  });
+
   it("listDir maps and sorts entries", async () => {
     fetchMock.mockResolvedValue(
       json([

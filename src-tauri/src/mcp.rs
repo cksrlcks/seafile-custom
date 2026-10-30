@@ -1,7 +1,7 @@
 //! Claude(MCP) 연결. Claude ─stdio─ `U-Drive --mcp`(relay) ─TCP─ 앱의 Hub ─이벤트─ WebView(JS가 MCP 처리)
 
 use std::collections::HashSet;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -51,13 +51,16 @@ impl Hub {
 
     fn serve(&self, id: u64, stream: TcpStream) {
         let Ok(write) = stream.try_clone() else { return };
-        let mut lines = BufReader::new(stream).lines();
-        match lines.next() {
-            Some(Ok(t)) if t.trim_end() == self.token => {}
-            _ => return, // 토큰이 틀리면 두 핸들이 모두 drop되어 연결이 닫힌다
+        // 토큰 줄은 짧고 바로 온다. 아무 프로그램이나 붙어 끝없이 보내거나 붙잡고 있지 못하게 길이·시간을 제한한다
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+        let mut reader = BufReader::new(stream);
+        let mut first = String::new();
+        if (&mut reader).take(TOKEN_LINE_MAX).read_line(&mut first).is_err() || !same(first.trim_end().as_bytes(), self.token.as_bytes()) {
+            return; // 토큰이 틀리면 두 핸들이 모두 drop되어 연결이 닫힌다
         }
+        let _ = reader.get_ref().set_read_timeout(None);
         self.conns.lock().unwrap().insert(id, write);
-        for line in lines {
+        for line in reader.lines() {
             let Ok(line) = line else { break };
             let line = line.trim_end_matches('\r');
             if !line.is_empty() {
@@ -110,6 +113,14 @@ impl Hub {
             let _ = self.respond(conn, &rpc_error(&rid, "U-Drive 앱 화면이 다시 시작됐습니다. 다시 시도해 주세요."));
         }
     }
+}
+
+/// 토큰 줄 최대 길이(토큰 32자 + 줄바꿈 여유)
+const TOKEN_LINE_MAX: u64 = 256;
+
+/// 걸리는 시간이 내용과 상관없는 비교(토큰을 한 글자씩 맞혀 보지 못하게)
+fn same(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 fn rpc_error(id: &str, message: &str) -> String {
@@ -261,16 +272,28 @@ pub fn relay() -> i32 {
     }
 }
 
-/// 32자리 hex. ponytail: 표준 라이브러리 RandomState(OS 시드)로 만든다. 더 강한 난수가 필요하면 getrandom 크레이트로 교체
+/// 32자리 hex. OS 난수(128비트)
 fn new_token() -> String {
-    use std::hash::{BuildHasher, Hasher};
-    let part = || {
-        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-        h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
-        h.write_u32(std::process::id());
-        h.finish()
-    };
-    format!("{:016x}{:016x}", part(), part())
+    use ring::rand::SecureRandom;
+    let mut b = [0u8; 16];
+    ring::rand::SystemRandom::new().fill(&mut b).expect("OS 난수를 얻지 못했습니다");
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// mcp.json 쓰기. 토큰이 들어 있어 이 사용자만 읽게 한다(맥·리눅스 0600. 윈도우는 %APPDATA%가 이미 사용자 전용)
+fn write_private(path: &std::path::Path, data: &str) -> io::Result<()> {
+    let mut o = std::fs::OpenOptions::new();
+    o.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        o.mode(0o600);
+        // 예전 버전이 0644로 만든 파일이면 mode가 적용되지 않으니 먼저 바꾼다
+        if path.exists() {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    o.open(path)?.write_all(data.as_bytes())
 }
 
 /// 앱 시작 시: Hub를 띄우고 mcp.json에 포트·토큰을 쓴다. 받은 줄은 mcp-request 이벤트로 WebView에 넘긴다
@@ -286,7 +309,9 @@ pub fn setup(app: &AppHandle) {
     };
     if let Some(path) = mcp_json_path() {
         let _ = std::fs::create_dir_all(path.parent().unwrap());
-        let _ = std::fs::write(&path, serde_json::json!({ "port": port, "token": token }).to_string());
+        if let Err(e) = write_private(&path, &serde_json::json!({ "port": port, "token": token }).to_string()) {
+            eprintln!("mcp.json을 쓰지 못했습니다: {e}");
+        }
     }
     app.manage(hub);
 }
@@ -356,6 +381,47 @@ mod tests {
         hub.set_ready();
         let mut s = client(port, "wrong");
         writeln!(s, "hello").unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        let mut buf = [0u8; 8];
+        assert_eq!(s.read(&mut buf).unwrap_or(0), 0);
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn token_is_random_hex() {
+        let (a, b) = (new_token(), new_token());
+        assert_eq!(a.len(), 32);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn same_compares_bytes() {
+        assert!(same(b"abc", b"abc"));
+        assert!(!same(b"abc", b"abd"));
+        assert!(!same(b"abc", b"ab"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let p = std::env::temp_dir().join(format!("udrive-mcp-json-{}", new_token()));
+        std::fs::write(&p, "old").unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o644)).unwrap();
+        write_private(&p, "{}").unwrap();
+        assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), "{}");
+        std::fs::remove_file(p).unwrap();
+    }
+
+    #[test]
+    fn hub_rejects_long_first_line() {
+        let (hub, port, seen) = recording_hub();
+        hub.set_ready();
+        let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let _ = s.write_all(&vec![b'a'; 4096]);
+        let _ = writeln!(s, "\ntok\nhello");
         s.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
         let mut buf = [0u8; 8];
         assert_eq!(s.read(&mut buf).unwrap_or(0), 0);

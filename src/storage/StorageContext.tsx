@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { createProvider } from "./createProvider";
+import { deviceInfo } from "./device";
 import { clearToken, loadSession, saveSession, type Session } from "./session";
 import type { Connection, StorageProvider } from "./StorageProvider";
 
@@ -19,18 +20,25 @@ export function StorageRoot({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (conn: Connection, username: string, password: string, otp?: string, opts?: { persistent?: boolean }) => {
     const p = createProvider(conn, null);
-    await p.login(username, password, otp);
+    await p.login(username, password, otp, await deviceInfo());
     const next: Session = { connection: conn, token: p.token };
     saveSession(next, opts);
     setSession(next);
   }, []);
 
-  const logout = useCallback(() => {
+  // 토큰이 이미 무효(401)면 로컬에서만 지운다
+  const expire = useCallback(() => {
     clearToken();
     setSession(loadSession());
   }, []);
 
-  const api = useMemo<SessionApi>(() => ({ session, login, logout, onUnauthorized: logout }), [session, login, logout]);
+  // 사용자가 로그아웃: 서버의 토큰도 지운다(기다리지 않는다)
+  const logout = useCallback(() => {
+    void provider.logout();
+    expire();
+  }, [provider, expire]);
+
+  const api = useMemo<SessionApi>(() => ({ session, login, logout, onUnauthorized: expire }), [session, login, logout, expire]);
 
   return (
     <SessionCtx.Provider value={api}>

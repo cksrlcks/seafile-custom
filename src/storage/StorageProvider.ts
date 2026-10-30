@@ -1,3 +1,5 @@
+import type { DeviceInfo } from "./device";
+
 export interface Library {
   id: string;
   name: string;
@@ -96,7 +98,8 @@ export interface Connection {
 export interface StorageProvider {
   /** 현재 인증 토큰. 세션 저장용. 로그인 전/로그아웃 후 null */
   readonly token: string | null;
-  login(username: string, password: string, otp?: string): Promise<void>;
+  login(username: string, password: string, otp?: string, device?: DeviceInfo | null): Promise<void>;
+  /** 서버의 토큰도 지운다(가능하면) */
   logout(): Promise<void>;
   isLoggedIn(): boolean;
 

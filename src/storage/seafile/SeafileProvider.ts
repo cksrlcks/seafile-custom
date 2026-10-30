@@ -1,5 +1,6 @@
 import { StorageError, type Account, type Entry, type Library, type ShareLink, type ShareLinkInfo, type StorageProvider, type TrashEntry, type UploadTask } from "../StorageProvider";
 import { joinPath } from "../path";
+import type { DeviceInfo } from "../device";
 import { SeafileApi } from "./api";
 import { CHUNK_SIZE, chunkRanges } from "./chunk";
 import { clearInterrupted, isInterrupted, markInterrupted } from "./resumeRegistry";
@@ -29,17 +30,17 @@ export class SeafileProvider implements StorageProvider {
     return this._token;
   }
 
-  async login(username: string, password: string, otp?: string): Promise<void> {
-    const res = await this.api.postForm<{ token: string }>(
-      "/api2/auth-token/",
-      { username, password },
-      undefined,
-      otp ? { "X-SEAFILE-OTP": otp } : undefined,
-    );
+  /** device가 있으면 기기별 토큰(TokenV2): 서버의 '연결된 기기'에 이 PC가 따로 보이고 따로 끊을 수 있다 */
+  async login(username: string, password: string, otp?: string, device?: DeviceInfo | null): Promise<void> {
+    const form: Record<string, string> = { username, password };
+    if (device) Object.assign(form, { platform: device.platform, device_id: device.deviceId, device_name: device.deviceName, client_version: device.clientVersion });
+    const res = await this.api.postForm<{ token: string }>("/api2/auth-token/", form, undefined, otp ? { "X-SEAFILE-OTP": otp } : undefined);
     this._token = res.token;
   }
 
+  /** 서버에서도 이 토큰을 지운다(logout-device). 서버에 닿지 않아도 로컬 로그아웃은 그대로 */
   async logout(): Promise<void> {
+    if (this._token) await this.api.postForm("/api2/logout-device/", {}).catch(() => undefined);
     this._token = null;
   }
 

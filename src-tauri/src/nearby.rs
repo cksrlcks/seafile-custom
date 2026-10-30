@@ -1,7 +1,7 @@
 //! 바로 보내기. 같은 네트워크의 U-Drive끼리 mDNS(_udrive._tcp)로 서로 찾고, 파일은 서버를 거치지 않고 TCP로 직접 보낸다.
 //! 같은 Seafile 서버에 로그인한 U-Drive끼리만 서로 보인다.
 //!
-//! 전송 한 번 = TCP 연결 하나
+//! 전송 한 번 = TCP 연결 하나. 연결은 TLS 1.3이고, 보내는 쪽은 상대 인증서가 mDNS로 알린 지문과 같은지 확인한다(tls.rs)
 //!   보내는 쪽 → 헤더 한 줄(JSON: 보낸 사람·파일 목록)
 //!   받는 쪽   → 답 한 줄({"ok":true} / {"ok":false,"reason":..}). 사용자에게 물어보고 답한다
 //!   보내는 쪽 → 파일 바이트를 목록 순서대로 이어서
@@ -14,18 +14,26 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::net::IpAddr;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+use crate::tls;
+
 const SERVICE: &str = "_udrive._tcp.local.";
-const VERSION: u32 = 1;
+/// 2: TLS. mDNS TXT의 v도 같은 값이고, 다른 버전은 목록에 넣지 않는다
+const VERSION: u32 = 2;
 /// 받을지 묻고 기다리는 시간. 지나면 거절
 const ASK_TIMEOUT: Duration = Duration::from_secs(60);
 /// 전송 중 상대가 이만큼 아무것도 보내지 않으면 끊는다
 const IO_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LINE: u64 = 256 * 1024;
+/// 동시에 받는 연결 수. 넘으면 바로 끊는다(연결마다 스레드 하나)
+const MAX_CONNS: usize = 8;
+/// 동시에 묻는 받기 요청 수. 넘거나 같은 PC가 이미 묻는 중이면 "busy"로 거절한다(팝업 폭탄 방지)
+const MAX_ASKS: usize = 4;
 /// 받기 요청 팝업 창. 화면(main.tsx)은 이 이름을 보고 팝업만 그린다
 const POPUP: &str = "nearby-offer";
 const POPUP_SIZE: (f64, f64) = (360.0, 314.0);
@@ -74,6 +82,9 @@ pub struct Peer {
     person: Person,
     #[serde(skip)]
     addrs: Vec<SocketAddr>,
+    /// 상대가 mDNS로 알린 인증서 지문. 연결할 때 이것과 같은 인증서인지 본다
+    #[serde(skip)]
+    fp: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -120,6 +131,13 @@ impl Transfer {
     }
 }
 
+/// 사용자에게 묻는 중인 받기 요청
+struct Ask {
+    tx: mpsc::Sender<Answer>,
+    offer: Offer,
+    ip: IpAddr,
+}
+
 enum Answer {
     /// target: Some(드라이브 폴더)면 드라이브로 받기. pc_dir: PC에 받을 폴더(없으면 다운로드 폴더)
     Accept { target: Option<serde_json::Value>, pc_dir: Option<PathBuf> },
@@ -134,9 +152,13 @@ pub struct Nearby {
     /// start할 때마다 올린다. 이전 browse 스레드가 늦게 보낸 이벤트를 버리려고
     generation: AtomicU64,
     port: Mutex<Option<u16>>,
+    /// 받기용 인증서. 포트를 열 때 한 번 만든다
+    identity: Mutex<Option<Arc<tls::Identity>>>,
+    /// 지금 받고 있는 연결 수
+    active: AtomicUsize,
     peers: Mutex<HashMap<String, Peer>>,
     /// 사용자에게 묻는 중인 받기
-    asks: Mutex<HashMap<String, (mpsc::Sender<Answer>, Offer)>>,
+    asks: Mutex<HashMap<String, Ask>>,
     /// 진행 중인 연결. 취소하면 shutdown해서 막힌 읽기·쓰기를 깨운다
     conns: Mutex<HashMap<String, TcpStream>>,
     canceled: Mutex<HashSet<String>>,
@@ -155,6 +177,8 @@ pub fn setup(app: &AppHandle) {
         daemon: Mutex::new(None),
         generation: AtomicU64::new(0),
         port: Mutex::new(None),
+        identity: Mutex::new(None),
+        active: AtomicUsize::new(0),
         peers: Default::default(),
         asks: Default::default(),
         conns: Default::default(),
@@ -176,10 +200,13 @@ impl Nearby {
             return Ok(());
         }
         self.stop(app);
-        let port = self.listen(app)?;
+        let (port, identity) = self.listen(app)?;
         let daemon = ServiceDaemon::new().map_err(|e| e.to_string())?;
         let instance = format!("udrive-{}", self.id);
+        let version = VERSION.to_string();
         let props = [
+            ("v", version.as_str()),
+            ("fp", identity.fingerprint.as_str()),
             ("id", self.id.as_str()),
             ("name", me.person.name.as_str()),
             ("email", me.person.email.as_str()),
@@ -226,14 +253,15 @@ impl Nearby {
         match ev {
             ServiceEvent::ServiceResolved(s) => {
                 let prop = |k: &str| s.get_property_val_str(k).unwrap_or_default().to_string();
-                if prop("id") == self.id || prop("server") != server {
+                // 다른 버전(예전 평문 전송)은 서로 연결할 수 없으니 목록에 넣지 않는다
+                if prop("id") == self.id || prop("server") != server || prop("v") != VERSION.to_string() || prop("fp").len() != 64 {
                     return;
                 }
                 let addrs: Vec<SocketAddr> = s.get_addresses().iter().map(|ip| ip.to_ip_addr()).filter(|ip| ip.is_ipv4()).map(|ip| SocketAddr::new(ip, s.get_port())).collect();
                 if addrs.is_empty() {
                     return;
                 }
-                let peer = Peer { id: s.get_fullname().to_string(), person: Person { name: prop("name"), email: prop("email"), device: prop("device") }, addrs };
+                let peer = Peer { id: s.get_fullname().to_string(), person: Person { name: prop("name"), email: prop("email"), device: prop("device") }, addrs, fp: prop("fp") };
                 self.peers.lock().unwrap().insert(peer.id.clone(), peer);
                 self.emit_peers(app);
             }
@@ -256,24 +284,34 @@ impl Nearby {
         let _ = app.emit("nearby-peers", self.peer_list());
     }
 
-    /// 받기용 TCP 포트. 처음 start할 때 한 번 연다
-    fn listen(self: &Arc<Self>, app: &AppHandle) -> Result<u16, String> {
+    /// 받기용 TCP 포트와 인증서. 처음 start할 때 한 번 만든다
+    fn listen(self: &Arc<Self>, app: &AppHandle) -> Result<(u16, Arc<tls::Identity>), String> {
         let mut port = self.port.lock().unwrap();
-        if let Some(p) = *port {
-            return Ok(p);
+        let mut identity = self.identity.lock().unwrap();
+        if let (Some(p), Some(id)) = (*port, identity.as_ref()) {
+            return Ok((p, id.clone()));
         }
+        let id = Arc::new(tls::Identity::new()?);
         let listener = TcpListener::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
         let p = listener.local_addr().map_err(|e| e.to_string())?.port();
         let (n, app) = (self.clone(), app.clone());
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(stream) = stream else { continue };
+                if n.active.fetch_add(1, Ordering::SeqCst) >= MAX_CONNS {
+                    n.active.fetch_sub(1, Ordering::SeqCst);
+                    continue; // drop하면 끊긴다
+                }
                 let (n, app) = (n.clone(), app.clone());
-                std::thread::spawn(move || n.receive(&app, stream));
+                std::thread::spawn(move || {
+                    n.receive(&app, stream);
+                    n.active.fetch_sub(1, Ordering::SeqCst);
+                });
             }
         });
         *port = Some(p);
-        Ok(p)
+        *identity = Some(id.clone());
+        Ok((p, id))
     }
 
     fn next_id(&self, prefix: &str) -> String {
@@ -282,31 +320,43 @@ impl Nearby {
 
     fn receive(&self, app: &AppHandle, stream: TcpStream) {
         let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
-        let Ok(mut w) = stream.try_clone() else { return };
-        let mut r = BufReader::new(stream);
+        let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
+        let Ok(ip) = stream.peer_addr().map(|a| a.ip()) else { return };
+        // 암호화 전 소켓: 취소할 때 shutdown, 묻는 동안 끊겼는지 보기
+        let Ok(raw) = stream.try_clone() else { return };
+        let Some(identity) = self.identity.lock().unwrap().clone() else { return };
+        let Ok(tls) = identity.accept(stream) else { return };
+        let mut r = BufReader::new(tls);
         let Ok(header) = read_json::<Header>(&mut r) else { return };
         let me = self.me.lock().unwrap().clone();
         let files = match check_offer(&header, me.as_ref()) {
             Ok(f) => f,
-            Err(reason) => return drop(write_json(&mut w, &Reply::no(reason))),
+            Err(reason) => return drop(write_json(r.get_mut(), &Reply::no(reason))),
         };
         let total = files.iter().map(|f| f.size).sum();
         let id = self.next_id("r");
 
         let (tx, rx) = mpsc::channel();
         let offer = Offer { id: id.clone(), from: header.from.clone(), files: files.clone(), total };
-        self.asks.lock().unwrap().insert(id.clone(), (tx, offer.clone()));
+        {
+            let mut asks = self.asks.lock().unwrap();
+            if asks.len() >= MAX_ASKS || asks.values().any(|a| a.ip == ip) {
+                drop(asks);
+                return drop(write_json(r.get_mut(), &Reply::no("busy")));
+            }
+            asks.insert(id.clone(), Ask { tx, offer: offer.clone(), ip });
+        }
         let _ = app.emit("nearby-offer", offer);
         open_popup(app);
 
-        let answer = wait_answer(&rx, r.get_ref(), ASK_TIMEOUT);
+        let answer = wait_answer(&rx, &raw, ASK_TIMEOUT);
         self.asks.lock().unwrap().remove(&id);
         let _ = app.emit("nearby-offer-closed", &id);
         self.close_popup_if_idle(app);
         let (target, pc_dir) = match answer {
             Some(Answer::Accept { target, pc_dir }) => (target, pc_dir),
-            Some(Answer::Decline) => return drop(write_json(&mut w, &Reply::no("declined"))),
-            None => return drop(write_json(&mut w, &Reply::no("timeout"))),
+            Some(Answer::Decline) => return drop(write_json(r.get_mut(), &Reply::no("declined"))),
+            None => return drop(write_json(r.get_mut(), &Reply::no("timeout"))),
         };
         // 드라이브로 받기: 임시 폴더에 받고 메인 창이 올린다. 화면이 읽어 올릴 수 있는 크기(READ_CAP)를 넘는 파일은 PC 폴더에
         let drive = target.is_some();
@@ -314,15 +364,15 @@ impl Nearby {
         let temp = app.path().app_cache_dir().ok().map(|d| d.join("nearby-in").join(&id));
         let big = |f: &FileMeta| f.size > crate::localfs::READ_CAP;
         let Some(dirs) = files.iter().map(|f| if drive && !big(f) { temp.clone() } else { pc.clone() }).collect::<Option<Vec<PathBuf>>>() else {
-            return drop(write_json(&mut w, &Reply::no("disk")));
+            return drop(write_json(r.get_mut(), &Reply::no("disk")));
         };
-        if write_json(&mut w, &Reply { ok: true, ..Default::default() }).is_err() {
+        if write_json(r.get_mut(), &Reply { ok: true, ..Default::default() }).is_err() {
             return;
         }
 
         let mut t = Transfer { id: id.clone(), send: false, peer: header.from.name.clone(), name: files[0].name.clone(), count: files.len(), done: 0, total, status: "active", error: None, path: None, upload: vec![], note: None, target };
         t.emit(app);
-        if let Ok(c) = w.try_clone() {
+        if let Ok(c) = raw.try_clone() {
             self.conns.lock().unwrap().insert(id.clone(), c);
         }
         let mut tick = Ticker::default();
@@ -335,11 +385,13 @@ impl Nearby {
         let canceled = self.canceled.lock().unwrap().remove(&id);
         match result {
             Ok(paths) => {
-                let _ = write_json(&mut w, &Reply { ok: true, done: true, ..Default::default() });
+                let _ = write_json(r.get_mut(), &Reply { ok: true, done: true, ..Default::default() });
                 t.done = total;
                 t.status = "done";
                 let in_temp = |p: &PathBuf| temp.as_ref().is_some_and(|d| p.starts_with(d));
                 let (upload, local): (Vec<&PathBuf>, Vec<&PathBuf>) = paths.iter().partition(|p| in_temp(p));
+                // PC에 받은 파일은 OS에 "다른 곳에서 온 파일"로 알린다. 드라이브로 올릴 임시 파일은 올린 뒤 지운다
+                local.iter().for_each(|p| mark_from_network(p));
                 t.upload = upload.iter().map(|p| p.to_string_lossy().into_owned()).collect();
                 t.path = local.first().map(|p| p.to_string_lossy().into_owned());
                 if drive && !local.is_empty() {
@@ -371,7 +423,11 @@ impl Nearby {
             if let Ok(c) = stream.try_clone() {
                 self.conns.lock().unwrap().insert(id.clone(), c);
             }
-            send_over(stream, &header, &files, || Transfer { status: "active", ..t.clone() }.emit(app), |done| {
+            let raw = stream.try_clone()?;
+            raw.set_read_timeout(Some(IO_TIMEOUT))?;
+            raw.set_write_timeout(Some(IO_TIMEOUT))?;
+            let tls = tls::connect(stream, &peer.fp)?;
+            send_over(tls, &raw, &header, &files, || Transfer { status: "active", ..t.clone() }.emit(app), |done| {
                 if tick.due() {
                     Transfer { done, status: "active", ..t.clone() }.emit(app);
                 }
@@ -420,14 +476,14 @@ impl Nearby {
     }
 
     fn offer_list(&self) -> Vec<Offer> {
-        let mut v: Vec<Offer> = self.asks.lock().unwrap().values().map(|(_, o)| o.clone()).collect();
+        let mut v: Vec<Offer> = self.asks.lock().unwrap().values().map(|a| a.offer.clone()).collect();
         v.sort_by_key(|o| o.id[1..].parse::<u64>().unwrap_or_default());
         v
     }
 
     fn cancel(&self, id: &str) {
-        if let Some((tx, _)) = self.asks.lock().unwrap().get(id) {
-            let _ = tx.send(Answer::Decline);
+        if let Some(a) = self.asks.lock().unwrap().get(id) {
+            let _ = a.tx.send(Answer::Decline);
             return;
         }
         if let Some(c) = self.conns.lock().unwrap().get(id) {
@@ -487,10 +543,15 @@ fn check_offer(h: &Header, me: Option<&Me>) -> Result<Vec<FileMeta>, &'static st
     h.files.iter().map(|f| Ok(FileMeta { name: safe_name(&f.name).ok_or("name")?, size: f.size })).collect::<Result<_, _>>()
 }
 
-/// 상대가 준 이름에서 경로를 떼고 OS가 못 쓰는 글자를 바꾼다. 쓸 수 없는 이름이면 None
+/// 화면에 안 보이거나 글자 방향을 바꾸는 문자. 이름에 끼면 "보고서\u{202E}fdp.exe"가 "보고서exe.pdf"로 보인다
+fn is_invisible(c: char) -> bool {
+    matches!(c, '\u{00AD}' | '\u{061C}' | '\u{180E}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}' | '\u{FFF9}'..='\u{FFFB}')
+}
+
+/// 상대가 준 이름에서 경로를 떼고 OS가 못 쓰는 글자를 바꾸고 안 보이는 문자를 지운다. 쓸 수 없는 이름이면 None
 fn safe_name(name: &str) -> Option<String> {
     let base = name.rsplit(['/', '\\']).next().unwrap_or("");
-    let cleaned: String = base.chars().map(|c| if c.is_control() || "<>:\"|?*".contains(c) { '_' } else { c }).collect();
+    let cleaned: String = base.chars().filter(|&c| !is_invisible(c)).map(|c| if c.is_control() || "<>:\"|?*".contains(c) { '_' } else { c }).collect();
     // 윈도우는 끝의 점·공백을 지운다
     let cleaned = cleaned.trim().trim_end_matches('.').to_string();
     if cleaned.is_empty() || cleaned == "." || cleaned == ".." {
@@ -513,6 +574,31 @@ fn create_free(dir: &Path, name: &str) -> io::Result<(File, PathBuf)> {
         }
     }
     unreachable!()
+}
+
+/// 받은 파일에 "다른 곳에서 온 파일" 표시를 붙인다(브라우저·메신저로 받은 파일과 같게). 실패해도 받기는 그대로.
+/// 맥은 quarantine 확장 속성이라 앱·스크립트를 열 때 Gatekeeper가 검사하고,
+/// 윈도우는 Zone.Identifier(ZoneId=3, 인터넷)라 SmartScreen·Office 제한된 보기가 적용된다
+fn mark_from_network(path: &Path) {
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let Ok(p) = std::ffi::CString::new(path.as_os_str().as_bytes()) else { return };
+        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or_default();
+        let value = format!("0081;{secs:08x};U-Drive;");
+        // SAFETY: p·이름은 NUL로 끝나는 C 문자열이고, value는 길이와 함께 넘긴다
+        unsafe {
+            libc::setxattr(p.as_ptr(), c"com.apple.quarantine".as_ptr(), value.as_ptr().cast(), value.len(), 0, 0);
+        }
+    }
+    #[cfg(windows)]
+    {
+        let mut ads = path.as_os_str().to_owned();
+        ads.push(":Zone.Identifier");
+        let _ = fs::write(ads, "[ZoneTransfer]\r\nZoneId=3\r\n");
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = path;
 }
 
 /// 파일 목록 순서대로 이어 온 바이트를 저장한다(files[i]는 dirs[i]에). 실패하면 받던 파일만 지우고, 다 받은 파일은 남긴다
@@ -577,29 +663,29 @@ fn connect(addrs: &[SocketAddr]) -> Result<TcpStream, SendError> {
     Err(last.into())
 }
 
-/// 헤더를 보내고 상대 답을 기다린 뒤 파일을 보낸다. on_accept는 상대가 받기로 했을 때 한 번
-fn send_over(stream: TcpStream, header: &Header, files: &[(PathBuf, FileMeta)], on_accept: impl FnOnce(), mut progress: impl FnMut(u64)) -> Result<(), SendError> {
-    let mut w = stream.try_clone()?;
+/// 헤더를 보내고 상대 답을 기다린 뒤 파일을 보낸다. on_accept는 상대가 받기로 했을 때 한 번.
+/// stream은 TLS로 감싼 연결, raw는 그 아래 소켓(시간 제한을 바꾸는 데만 쓴다)
+fn send_over(stream: impl Read + Write, raw: &TcpStream, header: &Header, files: &[(PathBuf, FileMeta)], on_accept: impl FnOnce(), mut progress: impl FnMut(u64)) -> Result<(), SendError> {
     let mut r = BufReader::new(stream);
-    write_json(&mut w, header)?;
+    write_json(r.get_mut(), header)?;
     // 상대가 묻는 동안은 기다린다. 시간 초과는 받는 쪽이 답으로 알려준다
-    r.get_ref().set_read_timeout(Some(ASK_TIMEOUT + IO_TIMEOUT))?;
+    raw.set_read_timeout(Some(ASK_TIMEOUT + IO_TIMEOUT))?;
     let reply: Reply = read_json(&mut r)?;
     if !reply.ok {
         return Err(SendError::Refused(reply.reason.unwrap_or_default()));
     }
     on_accept();
-    r.get_ref().set_read_timeout(Some(IO_TIMEOUT))?;
-    w.set_write_timeout(Some(IO_TIMEOUT))?;
+    raw.set_read_timeout(Some(IO_TIMEOUT))?;
+    raw.set_write_timeout(Some(IO_TIMEOUT))?;
     let mut sent = 0;
     for (path, f) in files {
         let mut src = File::open(path)?;
-        copy_exact(&mut src, &mut w, f.size, |n| {
+        copy_exact(&mut src, r.get_mut(), f.size, |n| {
             sent += n;
             progress(sent);
         })?;
     }
-    w.flush()?;
+    r.get_mut().flush()?;
     let done: Reply = read_json(&mut r)?;
     if !done.done {
         return Err(SendError::Refused(done.reason.unwrap_or_default()));
@@ -620,7 +706,7 @@ fn wait_answer(rx: &mpsc::Receiver<Answer>, stream: &TcpStream, timeout: Duratio
     }
 }
 
-/// 보낸 쪽은 답을 기다리는 동안 아무것도 보내지 않는다. 읽을 게 0바이트(EOF)면 끊은 것
+/// 보낸 쪽은 답을 기다리는 동안 아무것도 보내지 않는다. TLS 아래 소켓에 무엇이든 오면(EOF, 종료 알림) 끊은 것
 fn peer_closed(stream: &TcpStream) -> bool {
     if stream.set_nonblocking(true).is_err() {
         return false;
@@ -628,8 +714,7 @@ fn peer_closed(stream: &TcpStream) -> bool {
     let r = stream.peek(&mut [0u8; 1]);
     let _ = stream.set_nonblocking(false);
     match r {
-        Ok(0) => true,
-        Ok(_) => false,
+        Ok(_) => true,
         Err(e) => e.kind() != io::ErrorKind::WouldBlock,
     }
 }
@@ -658,6 +743,7 @@ fn refused_message(reason: &str) -> &'static str {
         "off" => "상대가 바로 보내기를 끄고 있습니다",
         "version" => "상대 U-Drive 버전이 맞지 않습니다. 둘 다 업데이트해 주세요",
         "disk" => "상대 PC에 저장할 폴더가 없습니다",
+        "busy" => "상대가 다른 받기 요청에 답하는 중입니다. 잠시 뒤 다시 보내 주세요",
         _ => "전송이 중단됐습니다",
     }
 }
@@ -668,6 +754,8 @@ fn io_message(e: &io::Error) -> String {
         io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock => "응답이 없어 중단했습니다".into(),
         io::ErrorKind::ConnectionRefused => "상대에게 연결할 수 없습니다".into(),
         io::ErrorKind::NotFound => "파일을 찾을 수 없습니다".into(),
+        // TLS 실패: 인증서 지문이 다름(다른 PC가 주소를 가로챘거나 상대가 다시 시작함) 등
+        io::ErrorKind::InvalidData => "상대 기기를 확인하지 못해 보내지 않았습니다. 목록을 새로 고친 뒤 다시 보내 주세요".into(),
         _ => e.to_string(),
     }
 }
@@ -688,15 +776,14 @@ impl Ticker {
 }
 
 fn random_id() -> String {
-    use std::hash::{BuildHasher, Hasher};
-    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-    h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default());
-    h.write_u32(std::process::id());
-    format!("{:016x}", h.finish())
+    use ring::rand::SecureRandom;
+    let mut b = [0u8; 8];
+    let _ = ring::rand::SystemRandom::new().fill(&mut b);
+    b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
 /// 받는 사람 목록에 보일 PC 이름. 맥은 "…MacBook-Pro.local"처럼 오므로 .local을 뗀다
-fn device_name() -> String {
+pub(crate) fn device_name() -> String {
     let h = gethostname::gethostname().to_string_lossy().into_owned();
     h.strip_suffix(".local").unwrap_or(&h).to_string()
 }
@@ -756,8 +843,8 @@ pub fn nearby_offers(state: State<Arc<Nearby>>) -> Vec<Offer> {
 /// pc_dir은 PC에 받을 폴더(설정에서 고른 곳). 없으면 다운로드 폴더
 #[tauri::command]
 pub fn nearby_answer(state: State<Arc<Nearby>>, id: String, accept: bool, target: Option<serde_json::Value>, pc_dir: Option<String>) {
-    if let Some((tx, _)) = state.asks.lock().unwrap().get(&id) {
-        let _ = tx.send(if accept { Answer::Accept { target, pc_dir: pc_dir.map(PathBuf::from) } } else { Answer::Decline });
+    if let Some(a) = state.asks.lock().unwrap().get(&id) {
+        let _ = a.tx.send(if accept { Answer::Accept { target, pc_dir: pc_dir.map(PathBuf::from) } } else { Answer::Decline });
     }
 }
 
@@ -809,6 +896,9 @@ mod tests {
         assert_eq!(safe_name("..\\..\\win.ini").as_deref(), Some("win.ini"));
         assert_eq!(safe_name("a:b?.txt").as_deref(), Some("a_b_.txt"));
         assert_eq!(safe_name("보고서.hwp ").as_deref(), Some("보고서.hwp"));
+        assert_eq!(safe_name("보고서\u{202E}fdp.exe").as_deref(), Some("보고서fdp.exe"));
+        assert_eq!(safe_name("a\u{200B}b\u{2066}.txt\u{FEFF}").as_deref(), Some("ab.txt"));
+        assert_eq!(safe_name("\u{202E}"), None);
         assert_eq!(safe_name("dir/"), None);
         assert_eq!(safe_name(".."), None);
         assert_eq!(safe_name(""), None);
@@ -836,27 +926,35 @@ mod tests {
         fs::remove_dir_all(d).unwrap();
     }
 
-    /// 받는 쪽 흉내: 헤더를 읽고 answer대로 답한 뒤, 받으면 저장하고 done을 보낸다
-    fn fake_receiver(answer: Option<&'static str>, dir: PathBuf) -> (SocketAddr, std::thread::JoinHandle<Vec<PathBuf>>) {
+    /// 받는 쪽 흉내(TLS): 헤더를 읽고 answer대로 답한 뒤, 받으면 저장하고 done을 보낸다. 인증서 지문도 돌려준다
+    fn fake_receiver(answer: Option<&'static str>, dir: PathBuf) -> (SocketAddr, String, std::thread::JoinHandle<Vec<PathBuf>>) {
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = l.local_addr().unwrap();
+        let id = tls::Identity::new().unwrap();
+        let fp = id.fingerprint.clone();
         let h = std::thread::spawn(move || {
             let (s, _) = l.accept().unwrap();
-            let mut w = s.try_clone().unwrap();
-            let mut r = BufReader::new(s);
+            let mut r = BufReader::new(id.accept(s).unwrap());
             let h: Header = read_json(&mut r).unwrap();
             let files = check_offer(&h, Some(&me("https://a"))).unwrap();
             if let Some(reason) = answer {
-                write_json(&mut w, &Reply::no(reason)).unwrap();
+                write_json(r.get_mut(), &Reply::no(reason)).unwrap();
                 return vec![];
             }
-            write_json(&mut w, &Reply { ok: true, ..Default::default() }).unwrap();
+            write_json(r.get_mut(), &Reply { ok: true, ..Default::default() }).unwrap();
             let dirs = vec![dir.clone(); files.len()];
             let saved = recv_files(&mut r, &files, &dirs, |_| {}).unwrap();
-            write_json(&mut w, &Reply { ok: true, done: true, ..Default::default() }).unwrap();
+            write_json(r.get_mut(), &Reply { ok: true, done: true, ..Default::default() }).unwrap();
             saved
         });
-        (addr, h)
+        (addr, fp, h)
+    }
+
+    /// 보내는 쪽 연결: TCP를 열고 지문을 확인해 TLS로 감싼다. 아래 소켓도 돌려준다
+    fn open(addr: SocketAddr, fp: &str) -> (rustls::StreamOwned<rustls::ClientConnection, TcpStream>, TcpStream) {
+        let s = connect(&[addr]).unwrap();
+        let raw = s.try_clone().unwrap();
+        (tls::connect(s, fp).unwrap(), raw)
     }
 
     #[test]
@@ -871,11 +969,11 @@ mod tests {
             (src.join("big.bin"), FileMeta { name: "big.bin".into(), size: big.len() as u64 }),
             (src.join("빈 파일.txt"), FileMeta { name: "빈 파일.txt".into(), size: 0 }),
         ];
-        let (addr, h) = fake_receiver(None, dst.clone());
-        let stream = connect(&[addr]).unwrap();
+        let (addr, fp, h) = fake_receiver(None, dst.clone());
+        let (stream, raw) = open(addr, &fp);
         let mut accepted = false;
         let mut last = 0;
-        send_over(stream, &Header { v: VERSION, server: "https://a".into(), from: me("https://a").person, files: files.iter().map(|f| f.1.clone()).collect() }, &files, || accepted = true, |n| last = n).unwrap();
+        send_over(stream, &raw, &Header { v: VERSION, server: "https://a".into(), from: me("https://a").person, files: files.iter().map(|f| f.1.clone()).collect() }, &files, || accepted = true, |n| last = n).unwrap();
         let saved = h.join().unwrap();
         assert!(accepted);
         assert_eq!(last, big.len() as u64);
@@ -892,9 +990,10 @@ mod tests {
         let src = tmp("src2");
         fs::write(src.join("a.txt"), b"hi").unwrap();
         let files = vec![(src.join("a.txt"), FileMeta { name: "a.txt".into(), size: 2 })];
-        let (addr, h) = fake_receiver(Some("declined"), src.clone());
+        let (addr, fp, h) = fake_receiver(Some("declined"), src.clone());
         let mut accepted = false;
-        let err = send_over(connect(&[addr]).unwrap(), &Header { v: VERSION, server: "https://a".into(), from: me("https://a").person, files: vec![files[0].1.clone()] }, &files, || accepted = true, |_| {}).unwrap_err();
+        let (stream, raw) = open(addr, &fp);
+        let err = send_over(stream, &raw, &Header { v: VERSION, server: "https://a".into(), from: me("https://a").person, files: vec![files[0].1.clone()] }, &files, || accepted = true, |_| {}).unwrap_err();
         h.join().unwrap();
         assert!(!accepted);
         assert!(matches!(err, SendError::Refused(r) if r == "declined"));
@@ -924,6 +1023,25 @@ mod tests {
         assert_eq!(fs::read(&saved[1]).unwrap(), b"BIG");
         fs::remove_dir_all(temp).unwrap();
         fs::remove_dir_all(pc).unwrap();
+    }
+
+    #[test]
+    fn busy_reason_has_message() {
+        assert_ne!(refused_message("busy"), refused_message("unknown"));
+    }
+
+    /// 받은 파일에 quarantine 확장 속성이 붙는다(맥)
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn marks_received_file_quarantined() {
+        let d = tmp("quarantine");
+        let p = d.join("받은 파일.pdf");
+        fs::write(&p, b"x").unwrap();
+        mark_from_network(&p);
+        let out = std::process::Command::new("xattr").arg("-p").arg("com.apple.quarantine").arg(&p).output().unwrap();
+        let v = String::from_utf8_lossy(&out.stdout);
+        assert!(v.starts_with("0081;") && v.contains(";U-Drive;"), "{v:?}");
+        fs::remove_dir_all(d).unwrap();
     }
 
     #[test]

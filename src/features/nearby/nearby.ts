@@ -59,6 +59,8 @@ export interface NearbyState {
   transfers: Transfer[];
   /** 찾기를 시작하지 못했을 때 사유 */
   error: string | null;
+  /** 회사 네트워크(서버에 닿는 곳)가 아니라 멈춰 둠 */
+  offNetwork: boolean;
 }
 
 /** 끝난 전송. 드라이브로 받기는 다 올릴 때까지 끝나지 않은 것으로 본다 */
@@ -74,7 +76,7 @@ export function upsert(list: Transfer[], t: Transfer): Transfer[] {
 }
 
 export class NearbyStore {
-  private state: NearbyState = { peers: [], offers: [], transfers: [], error: null };
+  private state: NearbyState = { peers: [], offers: [], transfers: [], error: null, offNetwork: false };
   private listeners = new Set<() => void>();
 
   subscribe = (l: () => void) => {
@@ -90,6 +92,7 @@ export class NearbyStore {
 
   setPeers = (peers: Peer[]) => this.set({ peers });
   setError = (error: string | null) => this.set({ error });
+  setOffNetwork = (offNetwork: boolean) => this.set({ offNetwork });
   addOffer = (o: Offer) => this.set({ offers: [...this.state.offers.filter((x) => x.id !== o.id), o] });
   closeOffer = (id: string) => this.set({ offers: this.state.offers.filter((x) => x.id !== id) });
   update = (t: Transfer) => this.set({ transfers: upsert(this.state.transfers, t) });
@@ -115,6 +118,19 @@ export async function listenNearby(): Promise<() => void> {
     listen<Transfer>("nearby-transfer", (e) => nearby.update(e.payload)),
   ]);
   return () => offs.forEach((f) => f());
+}
+
+/**
+ * 회사 네트워크인지: 서버에 인증서 오류 없이 닿으면 true. 서버 이름은 회사 밖에서도 사설 IP로 풀려서 밖에서는 닿지 않고,
+ * 다른 PC가 그 IP를 쓰더라도 서버 인증서를 낼 수 없다. no-cors라 CORS 설정과 상관없이 연결(TLS)이 되는지만 본다
+ */
+export async function serverReachable(server: string, timeoutMs = 5000, f: typeof fetch = fetch): Promise<boolean> {
+  try {
+    await f(`${server}/api2/ping/`, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function startNearby(me: { name: string; email: string; server: string }) {

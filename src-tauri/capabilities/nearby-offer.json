@@ -1,7 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "nearby-offer",
-  "description": "근처로 보내기 받기 요청 팝업",
-  "windows": ["nearby-offer"],
-  "permissions": ["core:default"]
+  "description": "근처로 보내기 받기 요청 팝업. 답하기에 필요한 커맨드만(파일 읽기·쓰기는 못 한다)",
+  "windows": [
+    "nearby-offer"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-nearby-offers",
+    "allow-nearby-answer",
+    "allow-nearby-open-settings",
+    "allow-append-log",
+    "allow-set-prefs"
+  ]
 }

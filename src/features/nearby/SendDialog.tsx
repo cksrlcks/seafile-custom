@@ -26,7 +26,7 @@ const localEntry = (path: string): Entry => ({ id: path, name: path.split(/[\\/]
 
 function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
   const storage = useStorage();
-  const { peers, error } = useNearby();
+  const { peers, error, offNetwork } = useNearby();
   const { nearbyVisible } = useAppPrefs();
   const [paths, setPaths] = useState<string[]>([]);
   const [peerId, setPeerId] = useState<string | null>(null);
@@ -85,7 +85,7 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
       <div className="grid gap-1.5">
         <div className="flex h-6 items-center gap-1.5 text-xs text-muted-foreground">
           받는 사람
-          {nearbyVisible && !error && <IconLoader2 className="size-3 animate-spin" aria-label="찾는 중" />}
+          {nearbyVisible && !error && !offNetwork && <IconLoader2 className="size-3 animate-spin" aria-label="찾는 중" />}
         </div>
         <ListBox
           className="h-[8.5rem]"
@@ -97,6 +97,8 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
                   켜기
                 </Button>
               </>
+            ) : offNetwork ? (
+              "회사 네트워크에 연결돼 있을 때만 쓸 수 있습니다"
             ) : error ? (
               `주변을 찾지 못했습니다 (${error})`
             ) : (

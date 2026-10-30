@@ -65,6 +65,7 @@ export function McpToolProvider(): null {
       workDir: async () => (await import("@tauri-apps/api/path")).join(await defaultDownloadDir(), "U-Drive 작업"),
       recentFiles: (dir, limit) => invoke<LocalFile[]>("recent_files", { dir, limit }),
       writeLocalFile: (path, data) => invoke<void>("write_local_file", { path, data: Array.from(data) }),
+      realPath: (path) => invoke<string>("real_path", { path }),
     };
     return () => {
       currentCtx = null;

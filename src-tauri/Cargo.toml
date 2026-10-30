@@ -29,12 +29,18 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 mdns-sd = "0.21"
 gethostname = "1"
+# 바로 보내기 TLS(실행마다 새 자체 서명 인증서)와 MCP 토큰 난수
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
+ring = "0.17"
 
 [target.'cfg(windows)'.dependencies]
 # 셸 아이콘(탐색기와 같은 파일/폴더 그림) 추출용
 windows = { version = "0.62", features = ["Win32_UI_Shell", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_System_Com"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# 받은 파일에 quarantine 확장 속성(setxattr)
+libc = "0.2"
 # Finder와 같은 파일/폴더 아이콘 추출용 (NSWorkspace)
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSGeometry", "NSString"] }

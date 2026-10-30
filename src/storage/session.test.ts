@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearToken, loadSession, saveSession } from "./session";
+import { clearToken, connectionFor, InsecureServerError, loadSession, saveSession } from "./session";
 
 function memStorage(): Storage {
   const m = new Map<string, string>();
@@ -27,6 +27,23 @@ describe("session", () => {
     const s = { local: memStorage(), session: memStorage() };
     saveSession({ connection: { kind: "seafile", baseUrl: "http://192.168.1.240" }, token: "t" }, {}, s);
     expect(loadSession(s)).toEqual({ connection: { kind: "seafile", baseUrl: "https://uxis.heavybear-lab.net" }, token: "t" });
+  });
+
+  it("ignores a saved http address other than the moved one", () => {
+    const s = { local: memStorage(), session: memStorage() };
+    saveSession({ connection: { kind: "seafile", baseUrl: "http://10.0.0.5" }, token: "t" }, {}, s);
+    expect(loadSession(s)).toEqual({ connection: { kind: "seafile", baseUrl: "https://uxis.heavybear-lab.net" }, token: null });
+  });
+
+  it("connectionFor accepts https, mock and local dev servers only", () => {
+    expect(connectionFor(" https://drive.example/ ")).toEqual({ kind: "seafile", baseUrl: "https://drive.example" });
+    expect(connectionFor("mock")).toEqual({ kind: "mock", baseUrl: "mock" });
+    expect(connectionFor("http://localhost:8000").baseUrl).toBe("http://localhost:8000");
+    expect(connectionFor("http://127.0.0.1").baseUrl).toBe("http://127.0.0.1");
+    expect(() => connectionFor("http://uxis.heavybear-lab.net")).toThrow(InsecureServerError);
+    expect(() => connectionFor("http://localhost.evil.com")).toThrow(InsecureServerError);
+    expect(connectionFor("uxis.heavybear-lab.net").baseUrl).toBe("https://uxis.heavybear-lab.net");
+    expect(() => connectionFor("ftp://x")).toThrow(InsecureServerError);
   });
 
   it("saveSession then loadSession round-trips", () => {

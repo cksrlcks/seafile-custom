@@ -1,6 +1,7 @@
 pub mod mcp;
 mod localfs;
 mod nearby;
+mod tls;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -27,6 +28,7 @@ fn set_prefs(state: State<Mutex<Prefs>>, close_to_tray: bool, download_dir: Opti
 fn free_path(dir: String, name: String) -> String {
     let dir = PathBuf::from(dir);
     let _ = std::fs::create_dir_all(&dir);
+    let name = localfs::plain_name(&name);
     let p = std::path::Path::new(&name);
     let (stem, ext) = (p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(), p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default());
     let mut path = dir.join(&name);
@@ -237,6 +239,12 @@ mod shell_icon {
     }
 }
 
+/// 이 PC 이름(Seafile 기기별 토큰의 기기 이름, 바로 보내기 목록과 같음)
+#[tauri::command]
+fn device_name() -> String {
+    nearby::device_name()
+}
+
 /// 창 닫기가 트레이로 숨기기일 때 실제 종료는 이 커맨드로
 #[tauri::command]
 fn quit(app: AppHandle) {
@@ -343,7 +351,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::write_local_file, nearby::nearby_start, nearby::nearby_stop, nearby::nearby_peers, nearby::nearby_offers, nearby::nearby_send, nearby::nearby_answer, nearby::nearby_cancel, nearby::nearby_cleanup, nearby::nearby_open_settings])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, device_name, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::real_path, localfs::write_local_file, nearby::nearby_start, nearby::nearby_stop, nearby::nearby_peers, nearby::nearby_offers, nearby::nearby_send, nearby::nearby_answer, nearby::nearby_cancel, nearby::nearby_cleanup, nearby::nearby_open_settings])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {

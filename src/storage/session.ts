@@ -22,9 +22,23 @@ const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "https://uxis
 const MOVED: Record<string, string> = { "http://192.168.1.240": DEFAULT.connection.baseUrl };
 const defaultStores = (): Stores => ({ local: localStorage, session: sessionStorage });
 
-/** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. */
+/** http 서버 주소: 비밀번호·토큰이 평문으로 나가므로 받지 않는다 */
+export class InsecureServerError extends Error {
+  constructor() {
+    super("서버 주소는 https://로 시작해야 합니다");
+  }
+}
+
+/** https, 개발용 mock, 이 PC 안의 개발 서버(http://localhost·127.0.0.1)만 허용 */
+export function isSecureServer(baseUrl: string): boolean {
+  return baseUrl === "mock" || /^https:\/\//i.test(baseUrl) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(baseUrl);
+}
+
+/** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. 주소만 쓰면 https로, http 주소면 InsecureServerError */
 export function connectionFor(url: string): Connection {
-  const baseUrl = url.trim().replace(/\/+$/, "");
+  const trimmed = url.trim().replace(/\/+$/, "");
+  const baseUrl = trimmed === "mock" || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  if (!isSecureServer(baseUrl)) throw new InsecureServerError();
   return { kind: baseUrl === "mock" ? "mock" : "seafile", baseUrl };
 }
 
@@ -42,7 +56,10 @@ export function loadSession(stores: Stores = defaultStores()): Session {
   const sess = parse(stores.session.getItem(KEY));
   const connection = local?.connection?.baseUrl ? local.connection : sess?.connection?.baseUrl ? sess.connection : DEFAULT.connection;
   const moved = MOVED[connection.baseUrl.toLowerCase()];
-  return { connection: moved ? { ...connection, baseUrl: moved } : connection, token: local?.token ?? sess?.token ?? null };
+  if (moved) return { connection: { ...connection, baseUrl: moved }, token: local?.token ?? sess?.token ?? null };
+  // 예전에 저장한 http 주소: 그 주소로는 요청하지 않는다(기본 주소로 다시 로그인)
+  if (!isSecureServer(connection.baseUrl)) return DEFAULT;
+  return { connection, token: local?.token ?? sess?.token ?? null };
 }
 
 export function saveSession(s: Session, opts: { persistent?: boolean } = {}, stores: Stores = defaultStores()): void {

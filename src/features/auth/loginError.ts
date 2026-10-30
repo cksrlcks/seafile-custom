@@ -1,3 +1,4 @@
+import { InsecureServerError } from "@/storage/session";
 import { StorageError } from "@/storage/StorageProvider";
 
 export interface LoginErrorInfo {
@@ -7,6 +8,7 @@ export interface LoginErrorInfo {
 
 /** 로그인 실패를 사용자 문구로. 서버가 자격증명 오류에 401 대신 400(credentials 문구)을 주는 경우도 처리한다. */
 export function loginErrorMessage(e: unknown): LoginErrorInfo {
+  if (e instanceof InsecureServerError) return { message: e.message, otpRequired: false };
   if (!(e instanceof StorageError)) return { message: "알 수 없는 오류가 발생했습니다", otpRequired: false };
   const body = e.message.toLowerCase();
   if (body === "otp required" || /two.?factor|otp/.test(body)) return { message: "2단계 인증 코드를 입력하세요", otpRequired: true };

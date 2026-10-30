@@ -58,6 +58,37 @@ pub async fn write_local_file(path: String, data: Vec<u8>) -> Result<(), String>
     write_new(Path::new(&path), &data)
 }
 
+/// 심볼릭 링크를 따라간 실제 경로. 아직 없는 파일이면 부모 폴더만 따라가 이름을 붙이고, 그것도 없으면 그대로.
+/// MCP가 숨김·시스템 폴더를 막을 때 링크로 돌아가지 못하게 쓴다(localPath.ts)
+fn resolve(path: &Path) -> std::path::PathBuf {
+    std::fs::canonicalize(path)
+        .or_else(|e| match (path.parent(), path.file_name()) {
+            (Some(dir), Some(name)) => std::fs::canonicalize(dir).map(|d| d.join(name)),
+            _ => Err(e),
+        })
+        .unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// 윈도우 canonicalize의 \\?\ 접두어를 뗀다(\\?\UNC\server → \\server)
+fn plain(p: &str) -> String {
+    if let Some(rest) = p.strip_prefix(r"\\?\UNC\") {
+        format!(r"\\{rest}")
+    } else {
+        p.strip_prefix(r"\\?\").unwrap_or(p).to_string()
+    }
+}
+
+#[tauri::command]
+pub fn real_path(path: String) -> String {
+    plain(&resolve(Path::new(&path)).to_string_lossy())
+}
+
+/// 저장할 이름에서 경로 부분을 뗀다(../ 로 다른 폴더에 쓰지 못하게). 남는 게 없으면 "file"
+pub(crate) fn plain_name(name: &str) -> String {
+    let base = name.rsplit(['/', '\\']).next().unwrap_or("").trim();
+    if base.is_empty() || base == "." || base == ".." { "file".into() } else { base.to_string() }
+}
+
 #[tauri::command]
 pub fn recent_files(dir: String, limit: usize) -> Result<Vec<LocalFile>, String> {
     list_recent(Path::new(&dir), limit)
@@ -96,6 +127,34 @@ mod tests {
         let p = temp_dir("cap").join("big.bin");
         std::fs::write(&p, [0u8; 11]).unwrap();
         assert!(read_capped(&p, 10).unwrap_err().contains("200MB"));
+    }
+
+    #[test]
+    fn plain_name_drops_directories() {
+        assert_eq!(plain_name("보고서.docx"), "보고서.docx");
+        assert_eq!(plain_name("../../Library/LaunchAgents/x.plist"), "x.plist");
+        assert_eq!(plain_name(r"..\..\x.bat"), "x.bat");
+        assert_eq!(plain_name(".."), "file");
+    }
+
+    #[test]
+    fn plain_strips_verbatim_prefix() {
+        assert_eq!(plain(r"\\?\C:\Users\a"), r"C:\Users\a");
+        assert_eq!(plain(r"\\?\UNC\srv\share"), r"\\srv\share");
+        assert_eq!(plain("/Users/a"), "/Users/a");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_follows_links() {
+        let d = temp_dir("link");
+        let secret = d.join(".ssh");
+        std::fs::create_dir(&secret).unwrap();
+        std::os::unix::fs::symlink(&secret, d.join("work")).unwrap();
+        let real = std::fs::canonicalize(&secret).unwrap();
+        assert_eq!(resolve(&d.join("work")), real);
+        assert_eq!(resolve(&d.join("work").join("new.txt")), real.join("new.txt"));
+        assert_eq!(resolve(Path::new("/no/such/dir/x")), Path::new("/no/such/dir/x"));
     }
 
     #[test]

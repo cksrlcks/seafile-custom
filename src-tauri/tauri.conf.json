@@ -22,7 +22,35 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob: https: http://localhost:* http://127.0.0.1:*",
+        "font-src": "'self' data:",
+        "connect-src": "'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*",
+        "frame-src": "'self' blob:",
+        "media-src": "'self' blob: https:",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline' 'unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob: https: http:",
+        "font-src": "'self' data:",
+        "connect-src": "'self' ipc: http://ipc.localhost https: http: ws:",
+        "frame-src": "'self' blob:",
+        "media-src": "'self' blob: https:",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {

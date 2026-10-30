@@ -6,6 +6,7 @@ import type { UploadQueue } from "@/features/upload/uploadQueue";
 import { formatDate, formatSize } from "@/lib/format";
 import { baseName, joinPath, parentPath } from "@/storage/path";
 import { StorageError, type Entry, type Library, type StorageProvider, type UploadTask } from "@/storage/StorageProvider";
+import { blockedLocalPath, plainFileName } from "./localPath";
 import { waitSettled } from "./waitSettled";
 
 export interface LocalFile {
@@ -32,6 +33,21 @@ export interface ToolCtx {
   recentFiles(dir: string, limit: number): Promise<LocalFile[]>;
   /** 새 파일로 쓴다(있는 파일은 덮어쓰지 않는다) */
   writeLocalFile(path: string, data: Uint8Array): Promise<void>;
+  /** 심볼릭 링크를 따라간 실제 경로(없는 경로면 그대로) */
+  realPath(path: string): Promise<string>;
+}
+
+/** Claude가 넘긴 PC 경로가 숨김·시스템 폴더면 막는다. 링크로 돌아가지 못하게 실제 경로도 본다 */
+async function allowLocal(ctx: ToolCtx, path: string): Promise<void> {
+  const reason = blockedLocalPath(path) ?? blockedLocalPath(await ctx.realPath(path));
+  if (reason) throw new Error(reason);
+}
+
+/** Claude가 준 파일 이름. 경로가 섞여 있으면 이름만 */
+function fileNameArg(args: Record<string, unknown>): string {
+  const name = plainFileName(arg<string>(args, "name", isStr));
+  if (!name) throw new Error("파일 이름이 올바르지 않습니다");
+  return name;
 }
 
 export interface ToolResult {
@@ -237,6 +253,7 @@ async function findFile(ctx: ToolCtx, libId: string, p: string): Promise<Entry> 
 async function download(ctx: ToolCtx, libId: string, paths: string[], localDir?: string): Promise<ToolResult> {
   await findLibrary(ctx, libId, "download");
   const entries = await Promise.all(paths.map((p) => findFile(ctx, libId, p)));
+  if (localDir) await allowLocal(ctx, localDir);
   const dir = localDir ?? (await ctx.workDir());
   // ponytail: 디스크에 있는 이름만 피한다(downloadEntries와 같은 한계). 같은 이름 둘을 한 번에 받으면 겹칠 수 있음
   const targets = await Promise.all(entries.map((e) => ctx.freePath(dir, e.name)));
@@ -308,16 +325,17 @@ async function run(name: string, args: Record<string, unknown>, ctx: ToolCtx): P
     }
     case "upload_file": {
       const paths = arg<string[]>(args, "local_paths", isStrs);
+      for (const p of paths) await allowLocal(ctx, p);
       const names = paths.map((p) => p.split(/[\\/]/).pop()!);
       return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), names, () => Promise.all(paths.map((p) => ctx.readLocalFile(p))), args.overwrite === true);
     }
     case "upload_text": {
-      const fileName = arg<string>(args, "name", isStr);
+      const fileName = fileNameArg(args);
       const content = arg<string>(args, "content", isStr);
       return upload(ctx, arg(args, "library", isStr), arg(args, "dir", isStr), [fileName], async () => [new File([content], fileName, { type: "text/plain" })], args.overwrite === true);
     }
     case "upload_base64": {
-      const fileName = arg<string>(args, "name", isStr);
+      const fileName = fileNameArg(args);
       const bytes = decodeBase64(arg(args, "base64", isStr));
       const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
       if (hash !== arg<string>(args, "sha256", isStr).trim().toLowerCase()) throw new Error("sha256이 맞지 않아 올리지 않았습니다. base64를 다시 구해 시도하세요.");

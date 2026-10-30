@@ -1,12 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLibraries } from "@/features/browse/useCurrentDir";
 import { setPrefs, useAppPrefs } from "@/features/settings/appPrefs";
 import { isTauri } from "@/features/shell/platform";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
 import type { Library } from "@/storage/StorageProvider";
-import { listenNearby, startNearby, stopNearby, uploadReceived, useNearby } from "./nearby";
+import { listenNearby, nearby, serverReachable, startNearby, stopNearby, uploadReceived, useNearby } from "./nearby";
+
+/** 회사 네트워크인지 다시 보는 간격. 노트북을 들고 나가면 늦어도 이만큼 뒤에 멈춘다 */
+const RECHECK_MS = 60_000;
+
+/** 서버에 닿는지(회사 네트워크인지). 처음엔 null, 이후 간격마다·네트워크가 바뀔 때마다 다시 본다 */
+function useOnNetwork(server: string, enabled: boolean): boolean | null {
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const check = () => void serverReachable(server).then((v) => alive && setOk(v));
+    check();
+    const t = setInterval(check, RECHECK_MS);
+    window.addEventListener("online", check);
+    window.addEventListener("offline", check);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener("online", check);
+      window.removeEventListener("offline", check);
+    };
+  }, [server, enabled]);
+  return ok;
+}
 
 /** 드라이브로 받기 기본 폴더: 내 첫 저장소의 '받은 파일'(받을 때 없으면 만든다) */
 export const DEFAULT_RECEIVE_FOLDER = "/받은 파일";
@@ -37,11 +61,15 @@ export function NearbyRoot() {
     return () => void off.then((f) => f());
   }, []);
 
+  // 회사 네트워크에서만 나를 알리고 받는다(카페·공항 Wi-Fi에 이름·이메일을 방송하지 않게)
+  const enabled = isTauri() && nearbyVisible && !!name && !!email;
+  const onNetwork = useOnNetwork(server, enabled);
+  useEffect(() => nearby.setOffNetwork(enabled && onNetwork === false), [enabled, onNetwork]);
   useEffect(() => {
-    if (!isTauri() || !nearbyVisible || !name || !email) return;
+    if (!enabled || !onNetwork || !name || !email) return;
     void startNearby({ name, email, server });
     return () => void stopNearby();
-  }, [nearbyVisible, name, email, server]);
+  }, [enabled, onNetwork, name, email, server]);
 
   // 드라이브 폴더가 아직 없거나 지금 계정에 없는 저장소면 기본 폴더로
   useEffect(() => {
