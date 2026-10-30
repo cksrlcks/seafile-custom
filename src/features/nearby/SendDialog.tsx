@@ -57,7 +57,7 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
     <>
       <DialogHeader>
         <DialogTitle>바로 보내기</DialogTitle>
-        <DialogDescription>같은 네트워크에서 같은 서버에 로그인한 사람에게 서버를 거치지 않고 보냅니다</DialogDescription>
+        <DialogDescription>같은 네트워크에 있는 U-Drive 사용자에게 파일을 보냅니다</DialogDescription>
       </DialogHeader>
 
       <div className="grid gap-1.5">
@@ -73,7 +73,7 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
         </div>
         <ListBox className="max-h-[7.25rem]" empty={files.length === 0 && "보낼 파일을 추가하세요"}>
           {files.map((e) => (
-            <div key={e.path} className="flex h-7 items-center gap-2 px-2 text-sm" title={e.path}>
+            <div key={e.path} className="flex h-7 shrink-0 items-center gap-2 rounded-[5px] px-2 text-sm" title={e.path}>
               <EntryIcon entry={e} />
               <span className="min-w-0 flex-1 truncate">{e.name}</span>
               {e.size > 0 && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatSize(e.size)}</span>}
@@ -113,7 +113,7 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
                 title={p.email}
                 onClick={() => setPeerId(p.id)}
                 onDoubleClick={() => files.length > 0 && send(p)}
-                className={cn("flex h-8 cursor-default items-center gap-2 px-2 text-sm", p.id === peerId ? "bg-selection" : "hover:bg-accent")}
+                className={cn("flex h-8 shrink-0 cursor-default items-center gap-2 rounded-[5px] px-2 text-sm", p.id === peerId ? "bg-selection" : "hover:bg-accent")}
               >
                 <IconDeviceDesktop className={cn("size-4 shrink-0", p.id === peerId ? "text-primary" : "text-muted-foreground")} stroke={1.75} />
                 <span className="truncate font-medium">{p.name}</span>
@@ -135,11 +135,11 @@ function Body({ source, onClose }: { source: SendSource; onClose(): void }) {
   );
 }
 
-/** 탐색기 목록처럼 테두리 친 상자. empty가 있으면 가운데 안내 문구 */
+/** 탐색기 목록처럼 테두리 친 상자. 행은 테두리에서 2px 안쪽, 선택은 살짝 둥글게. empty가 있으면 가운데 안내 문구 */
 function ListBox({ className, empty, children }: { className?: string; empty?: ReactNode; children: ReactNode }) {
   return (
-    <div role="listbox" className={cn("overflow-y-auto rounded-md border border-border bg-background py-0.5", className)}>
-      {empty ? <div className="flex h-full min-h-14 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">{empty}</div> : children}
+    <div role="listbox" className={cn("flex flex-col gap-px overflow-y-auto rounded-md border border-border bg-background p-0.5", className)}>
+      {empty ? <div className="flex min-h-14 flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">{empty}</div> : children}
     </div>
   );
 }

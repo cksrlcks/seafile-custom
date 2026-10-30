@@ -1,7 +1,7 @@
-import { IconDeviceDesktop, IconDeviceLaptop, IconFile } from "@tabler/icons-react";
-import { cn } from "cn";
+import { IconBuildingBroadcastTower, IconChevronDown, IconCloud, IconDeviceDesktop, IconDeviceLaptop } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setPrefs, useAppPrefs } from "@/features/settings/appPrefs";
 import { COVER } from "@/features/shell/cover";
 import { formatSize } from "@/lib/format";
@@ -39,18 +39,16 @@ function Card({ offer, waiting }: { offer: Offer; waiting: number }) {
   const prefs = useAppPrefs();
   const left = useCountdown();
   const to = prefs.receiveTo;
-  // 처음 받을 때(아직 안 정함)나 [바꾸기]를 누르면 고르는 줄을 보인다
-  const [choosing, setChoosing] = useState(to === null);
-  const first = to === null;
   const files = offer.files.length > 1 ? `${offer.files[0].name} 외 ${offer.files.length - 1}개` : offer.files[0].name;
   const big = to === "drive" && offer.files.some((f) => f.size > UPLOAD_CAP);
+  // 처음 받을 때(아직 안 정함)는 고른 곳이 다음에도 쓰인다고 알려 준다
+  const note = to === null ? "고른 곳으로 다음에도 받습니다. 설정에서 바꿀 수 있어요" : big ? "200MB가 넘는 파일은 PC 폴더에 받습니다" : "";
 
   const accept = () => void answerOffer(offer.id, true, to === "drive" ? prefs.receiveDrive : null, prefs.receivePcDir);
-  const note = first ? "고른 곳으로 다음에도 받습니다. 설정에서 바꿀 수 있어요" : choosing && to ? "다음에도 이렇게 받습니다" : big ? "200MB가 넘는 파일은 PC 폴더에 받습니다" : "";
 
   return (
     <div className="flex h-screen cursor-default flex-col border border-border bg-popover text-sm text-popover-foreground select-none">
-      <Cover name={offer.files[0].name} count={offer.files.length} left={left} />
+      <Cover left={left} />
       <div className="flex min-h-0 flex-1 flex-col px-4 pt-3">
         {/* 누가 무엇을 */}
         <div className="flex flex-col gap-1">
@@ -70,27 +68,10 @@ function Card({ offer, waiting }: { offer: Offer; waiting: number }) {
 
         {/* 어디로 */}
         <div className="mt-3 flex flex-col gap-1 border-t border-border pt-3">
-          <div className="flex h-6 items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <span className="shrink-0 text-muted-foreground">받을 위치</span>
-            {choosing ? (
-              <>
-                <Choice value={to} canDrive={!!prefs.receiveDrive} onChange={(v) => setPrefs({ receiveTo: v })} />
-                <button type="button" onClick={() => void openSendSettings()} className="ml-auto shrink-0 text-2xs text-primary hover:underline">
-                  폴더 바꾸기…
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="min-w-0 flex-1 truncate" title={receiveLabel(to!, prefs)}>
-                  {to === "drive" ? "드라이브" : "내 PC"} · {receiveLabel(to!, prefs)}
-                </span>
-                <button type="button" onClick={() => setChoosing(true)} className="shrink-0 text-2xs text-primary hover:underline">
-                  바꾸기
-                </button>
-              </>
-            )}
+            <Destination />
           </div>
-          {choosing && to && <div className="truncate text-2xs text-muted-foreground" title={receiveLabel(to, prefs)}>{receiveLabel(to, prefs)}</div>}
           {note && <div className="truncate text-2xs text-muted-foreground">{note}</div>}
         </div>
       </div>
@@ -107,20 +88,50 @@ function Card({ offer, waiting }: { offer: Offer; waiting: number }) {
   );
 }
 
-/** 맨 위 그림: 보낸 사람 PC → 파일 → 내 PC. 새 버전 알림과 같은 배경. 파일은 OS 셸 아이콘 */
-function Cover({ name, count, left }: { name: string; count: number; left: number }) {
-  const icon = useFileIcon(name);
+/** 받을 위치 고르기: 지금 정해진 곳을 보여 주는 버튼 하나. 누르면 내 PC · 드라이브 · 폴더 바꾸기 */
+function Destination() {
+  const prefs = useAppPrefs();
+  const to = prefs.receiveTo;
+  const Icon = to === "drive" ? IconCloud : IconDeviceDesktop;
   return (
-    <div className="relative flex h-20 shrink-0 items-center justify-center gap-3 text-white" style={COVER}>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex h-6.5 min-w-0 flex-1 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-left outline-none hover:bg-accent focus-visible:border-primary">
+        {to && <Icon className="size-3.5 shrink-0 text-muted-foreground" stroke={1.75} />}
+        <span className="min-w-0 flex-1 truncate">{to ? `${to === "drive" ? "드라이브" : "내 PC"} · ${receiveLabel(to, prefs)}` : <span className="text-muted-foreground">어디로 받을지 고르세요</span>}</span>
+        <IconChevronDown className="size-3.5 shrink-0 text-muted-foreground" stroke={1.75} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top">
+        <DropdownMenuRadioGroup value={to ?? ""} onValueChange={(v) => setPrefs({ receiveTo: v as "pc" | "drive" })}>
+          <DropdownMenuRadioItem value="pc" className="text-sm">
+            <span className="flex min-w-0 flex-col">
+              내 PC<span className="truncate text-2xs opacity-70">{receiveLabel("pc", prefs)}</span>
+            </span>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="drive" disabled={!prefs.receiveDrive} className="text-sm">
+            <span className="flex min-w-0 flex-col">
+              드라이브<span className="truncate text-2xs opacity-70">{receiveLabel("drive", prefs)}</span>
+            </span>
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => void openSendSettings()} className="text-sm">
+          폴더 바꾸기…
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** 맨 위 그림: 보낸 PC ··· 송신탑 ··· 내 PC. 새 버전 알림과 같은 배경 */
+function Cover({ left }: { left: number }) {
+  return (
+    <div className="relative flex h-28 shrink-0 items-center justify-center gap-3.5 text-white" style={COVER}>
       <span className="absolute top-2 right-2.5 text-2xs text-white/85 tabular-nums">{left}초</span>
-      <IconDeviceLaptop className="size-8 drop-shadow-md" stroke={1.5} />
+      <IconDeviceLaptop className="size-9 drop-shadow-md" stroke={1.5} />
       <Dots />
-      <span className="relative flex size-12 items-center justify-center rounded-lg bg-white/95 shadow-dialog">
-        {icon ? <img src={icon} alt="" className="size-8" draggable={false} /> : <IconFile className="size-7 text-muted-foreground" stroke={1.5} />}
-        {count > 1 && <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-medium text-primary-foreground tabular-nums">{count}</span>}
-      </span>
+      <IconBuildingBroadcastTower className="size-12 drop-shadow-md" stroke={1.4} />
       <Dots />
-      <IconDeviceDesktop className="size-8 drop-shadow-md" stroke={1.5} />
+      <IconDeviceDesktop className="size-9 drop-shadow-md" stroke={1.5} />
     </div>
   );
 }
@@ -133,49 +144,6 @@ function Dots() {
         <span key={i} className="size-1 animate-pulse rounded-full bg-white" style={{ animationDelay: `${i * 200}ms` }} />
       ))}
     </span>
-  );
-}
-
-/** 확장자에 맞는 OS 파일 아이콘(48px PNG). 팝업 창에는 쿼리 캐시가 없어 직접 받는다 */
-function useFileIcon(name: string): string | null {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
-    let url: string | null = null;
-    void import("@tauri-apps/api/core")
-      .then(({ invoke }) => invoke<ArrayBuffer>("file_icon", { ext, dir: false, size: 48 }))
-      .then((png) => setSrc((url = URL.createObjectURL(new Blob([png], { type: "image/png" })))))
-      .catch(() => {}); // 못 받으면 기본 아이콘
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [name]);
-  return src;
-}
-
-/** 내 PC · 드라이브 중 하나. 설정의 Segmented와 같은 모양(작게) */
-function Choice({ value, canDrive, onChange }: { value: "pc" | "drive" | null; canDrive: boolean; onChange(v: "pc" | "drive"): void }) {
-  const opts = [
-    { v: "pc" as const, label: "내 PC" },
-    { v: "drive" as const, label: "드라이브", disabled: !canDrive },
-  ];
-  return (
-    <div role="radiogroup" aria-label="받을 위치" className="flex shrink-0 rounded-md bg-muted p-0.5">
-      {opts.map((o) => (
-        <button
-          key={o.v}
-          type="button"
-          role="radio"
-          aria-checked={value === o.v}
-          disabled={o.disabled}
-          title={o.disabled ? "올릴 수 있는 저장소가 없습니다" : undefined}
-          onClick={() => onChange(o.v)}
-          className={cn("h-5 rounded-[5px] px-2.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50", value === o.v && "bg-card font-medium text-foreground shadow-button-subtle")}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

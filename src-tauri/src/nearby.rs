@@ -28,7 +28,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_LINE: u64 = 256 * 1024;
 /// 받기 요청 팝업 창. 화면(main.tsx)은 이 이름을 보고 팝업만 그린다
 const POPUP: &str = "nearby-offer";
-const POPUP_SIZE: (f64, f64) = (360.0, 300.0);
+const POPUP_SIZE: (f64, f64) = (360.0, 310.0);
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Person {

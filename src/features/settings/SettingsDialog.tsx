@@ -283,7 +283,7 @@ function SendPage() {
   return (
     <>
       <Section title="찾기">
-        <Row title="근처에서 나를 찾을 수 있게" desc="같은 네트워크에서 같은 서버에 로그인한 사람에게 보이고, 서버를 거치지 않고 파일을 주고받습니다">
+        <Row title="근처에서 나를 찾을 수 있게" desc="같은 네트워크에서 같은 서버에 로그인한 사람에게 보이고, 서로 파일을 주고받습니다">
           <Checkbox aria-label="근처에서 나를 찾을 수 있게" checked={prefs.nearbyVisible} onCheckedChange={(v) => setPrefs({ nearbyVisible: !!v })} />
         </Row>
       </Section>

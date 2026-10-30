@@ -72,7 +72,7 @@ function Body({ initial, onPick, onClose }: { initial: DriveFolder | null; onPic
           </div>
         </div>
 
-        <div role="listbox" className="h-56 overflow-y-auto rounded-md border border-border bg-background py-0.5">
+        <div role="listbox" className="flex h-56 flex-col gap-px overflow-y-auto rounded-md border border-border bg-background p-0.5">
           {!at.lib
             ? writable.map((l) => (
                 <Row key={l.id} selected={false} onOpen={() => go({ id: l.id, name: l.name }, "/")} icon={<IconCloud className="size-4 text-muted-foreground" stroke={1.75} />} label={l.name} hint={l.section} />
@@ -80,7 +80,7 @@ function Body({ initial, onPick, onClose }: { initial: DriveFolder | null; onPic
             : folders.map((f) => (
                 <Row key={f.path} selected={sel === f.path} onSelect={() => setSel(f.path)} onOpen={() => go(at.lib, joinPath(at.path, f.name))} icon={<EntryIcon entry={f} />} label={f.name} />
               ))}
-          {at.lib && dir.isSuccess && folders.length === 0 && <div className="flex h-full items-center justify-center text-xs text-muted-foreground">하위 폴더가 없습니다</div>}
+          {at.lib && dir.isSuccess && folders.length === 0 && <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">하위 폴더가 없습니다</div>}
         </div>
         <p className="truncate text-xs text-muted-foreground">
           {chosen ? `${chosen.libName}${chosen.path === "/" ? "" : chosen.path}` : "저장소를 더블클릭해 들어가세요"}
@@ -101,7 +101,7 @@ function Body({ initial, onPick, onClose }: { initial: DriveFolder | null; onPic
 
 function Row({ icon, label, hint, selected, onSelect, onOpen }: { icon: React.ReactNode; label: string; hint?: string; selected: boolean; onSelect?(): void; onOpen(): void }) {
   return (
-    <div role="option" aria-selected={selected} onClick={onSelect ?? onOpen} onDoubleClick={onOpen} className={cn("flex h-7 cursor-default items-center gap-2 px-2 text-sm", selected ? "bg-selection" : "hover:bg-accent")}>
+    <div role="option" aria-selected={selected} onClick={onSelect ?? onOpen} onDoubleClick={onOpen} className={cn("flex h-7 shrink-0 cursor-default items-center gap-2 rounded-[5px] px-2 text-sm", selected ? "bg-selection" : "hover:bg-accent")}>
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {hint && <span className="shrink-0 text-xs text-muted-foreground">{hint}</span>}
