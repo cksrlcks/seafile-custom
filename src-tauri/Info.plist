@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 바로 보내기: 같은 네트워크의 U-Drive를 mDNS로 찾는다(macOS 15+ 로컬 네트워크 권한 창에 보이는 설명) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>같은 네트워크에 있는 U-Drive 사용자와 파일을 바로 주고받으려면 로컬 네트워크 접근이 필요합니다.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_udrive._tcp</string>
+	</array>
+</dict>
+</plist>
