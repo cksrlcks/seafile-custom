@@ -76,3 +76,8 @@ export const dismissUpdate = () => set({ kind: "idle" });
 export function useUpdater(): UpdaterState {
   return useSyncExternalStore(subscribe, () => state);
 }
+
+/** 받을 수 있는 새 버전. 알림을 '나중에'로 닫아도 남는다(설치하거나 다시 확인해 없을 때까지) */
+export function useAvailableVersion(): string | null {
+  return useSyncExternalStore(subscribe, () => pending?.version ?? null);
+}

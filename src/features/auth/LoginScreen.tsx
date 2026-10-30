@@ -1,5 +1,5 @@
 import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CloudMark } from "@/components/ui/cloud-mark";
@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { useSession } from "@/storage/StorageContext";
 import { connectionFor, loadPrefs, savePrefs } from "@/storage/session";
 import { isMac, isTauri, showWindowControls } from "@/features/shell/platform";
+import { checkForUpdate } from "@/features/shell/updater";
+import { UpdateNotice } from "@/features/shell/UpdateNotice";
+import { VersionCheck } from "@/features/shell/VersionCheck";
 import { WindowControls } from "@/features/shell/WindowControls";
 import { loginErrorMessage } from "./loginError";
-import pkg from "../../../package.json";
 
 export function LoginScreen() {
   const { session, login } = useSession();
@@ -23,6 +25,8 @@ export function LoginScreen() {
   const [otpRequired, setOtpRequired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 로그인이 풀려 있어도 새 버전을 받을 수 있게 여기서도 한 번 조용히 확인한다
+  useEffect(() => void checkForUpdate(), []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -44,7 +48,7 @@ export function LoginScreen() {
 
   const drag = isTauri() ? { "data-tauri-drag-region": true } : {};
   return (
-    <div className="flex h-screen flex-col bg-linear-to-b from-background to-sidebar">
+    <div className="relative flex h-screen flex-col bg-linear-to-b from-background to-sidebar">
       {/* 기본 제목 표시줄이 없으므로 로그인 화면에도 드래그 영역과 창 버튼을 둔다 */}
       <div {...drag} className={isMac() && isTauri() ? "flex h-9 shrink-0 pl-20" : "flex h-9 shrink-0"}>
         <div {...drag} className="flex-1" />
@@ -97,7 +101,10 @@ export function LoginScreen() {
           {showServer && <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." className="h-8 md:text-xs" required />}
         </div>
       </form>
-      <p className="text-xs text-muted-foreground">v{pkg.version}</p>
+      <VersionCheck />
+      </div>
+      <div className="absolute right-3 bottom-3 z-20">
+        <UpdateNotice />
       </div>
     </div>
   );
