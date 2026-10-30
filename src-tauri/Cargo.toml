@@ -27,6 +27,8 @@ tauri-plugin-upload = "2"
 png = "0.18"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+mdns-sd = "0.21"
+gethostname = "1"
 
 [target.'cfg(windows)'.dependencies]
 # 셸 아이콘(탐색기와 같은 파일/폴더 그림) 추출용

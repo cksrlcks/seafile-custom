@@ -1,5 +1,6 @@
 pub mod mcp;
 mod localfs;
+mod nearby;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -54,6 +55,12 @@ fn append_log(app: AppHandle, line: String) -> Result<(), String> {
     }
     let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&path).map_err(|e| e.to_string())?;
     writeln!(f, "{line}").map_err(|e| e.to_string())
+}
+
+/// 받은 파일을 둘 폴더: 설정의 다운로드 폴더, 없으면 시스템 다운로드 폴더
+fn download_dir(app: &AppHandle) -> Option<PathBuf> {
+    let custom = app.state::<Mutex<Prefs>>().lock().unwrap().download_dir.clone();
+    custom.or_else(|| app.path().download_dir().ok())
 }
 
 #[tauri::command]
@@ -262,6 +269,7 @@ pub fn run() {
         .manage(Mutex::new(Prefs { close_to_tray: true, download_dir: None }))
         .setup(|app| {
             mcp::setup(app.handle());
+            nearby::setup(app.handle());
             // 로그인할 때 자동 실행이면 창 없이 트레이에만 둔다
             if std::env::args().any(|a| a == "--autostart") {
                 if let Some(w) = app.get_webview_window("main") {
@@ -277,6 +285,7 @@ pub fn run() {
                     &item("open", "U-Drive 열기")?,
                     &sep()?,
                     &item("upload", "파일 업로드…")?,
+                    &item("nearby", "근처로 보내기…")?,
                     &item("refresh", "새로고침")?,
                     &item("downloads", "다운로드 폴더 열기")?,
                     &sep()?,
@@ -298,8 +307,7 @@ pub fn run() {
                     "open" => show_main(app),
                     "quit" => app.exit(0),
                     "downloads" => {
-                        let custom = app.state::<Mutex<Prefs>>().lock().unwrap().download_dir.clone();
-                        if let Some(dir) = custom.or_else(|| app.path().download_dir().ok()) {
+                        if let Some(dir) = download_dir(app) {
                             let _ = app.opener().open_path(dir.to_string_lossy(), None::<&str>);
                         }
                     }
@@ -335,10 +343,13 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::write_local_file])
+        .invoke_handler(tauri::generate_handler![greet, file_icon, quit, set_prefs, free_path, append_log, open_log_dir, mcp::mcp_ready, mcp::mcp_respond, localfs::read_local_file, localfs::recent_files, localfs::write_local_file, nearby::nearby_start, nearby::nearby_stop, nearby::nearby_peers, nearby::nearby_offers, nearby::nearby_send, nearby::nearby_answer, nearby::nearby_cancel])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, _event| {
+            if let tauri::RunEvent::Exit = _event {
+                nearby::shutdown(_app);
+            }
             // macOS: 창을 숨긴 뒤 Dock 아이콘을 누르면 다시 띄운다
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = _event {

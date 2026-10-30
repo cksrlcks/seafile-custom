@@ -39,6 +39,8 @@ export interface MenuActions {
   settings(): void;
   trash(): void;
   shareLinks(): void;
+  /** 근처로 보내기. 설치된 앱에서만(없으면 메뉴 항목을 숨긴다) */
+  nearby?(): void;
 }
 
 const MOD = modKey();
@@ -74,6 +76,11 @@ export function MenuBar(a: MenuActions) {
             <MenubarItem onClick={a.shareLinks} className={item}>
               공유 링크 관리…
             </MenubarItem>
+            {a.nearby && (
+              <MenubarItem onClick={a.nearby} className={item}>
+                근처로 보내기…
+              </MenubarItem>
+            )}
             <MenubarItem disabled={a.readOnly || a.selection.count !== 1} onClick={a.rename} className={item}>
               이름 변경<MenubarShortcut>F2</MenubarShortcut>
             </MenubarItem>

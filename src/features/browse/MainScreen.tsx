@@ -17,6 +17,8 @@ import { OverwriteDialog, type OverwriteChoice } from "@/features/upload/Overwri
 import { planUploads } from "@/features/upload/planUploads";
 import { UploadPanel } from "@/features/upload/UploadPanel";
 import { DownloadPanel } from "@/features/download/DownloadPanel";
+import { NearbyPanel } from "@/features/nearby/NearbyPanel";
+import { SendDialog, type SendSource } from "@/features/nearby/SendDialog";
 import { useUploadQueue } from "@/features/upload/useUploadQueue";
 import { useSession, useStorage } from "@/storage/StorageContext";
 import { useStoredState } from "@/lib/useStoredState";
@@ -180,6 +182,13 @@ export function MainScreen() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [deleting, setDeleting] = useState<Entry[]>([]);
   const [sharing, setSharing] = useState<Entry | null>(null);
+  const [nearbySend, setNearbySend] = useState<SendSource | null>(null);
+  // 선택한 파일들(우클릭한 파일이 선택에 없으면 그 파일만). 폴더는 보내지 않는다
+  const sendNearby = (e?: Entry) => {
+    const list = (e && !selected.has(e.path) ? [e] : selectedEntries).filter((x) => x.type === "file");
+    if (loc.libId && list.length) setNearbySend({ kind: "drive", libId: loc.libId, entries: list });
+    else setNearbySend({ kind: "local" });
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** 메인 영역: 파일 탐색 · 공유 링크 · 휴지통 페이지. 어디로든 이동하면 파일 탐색으로 돌아온다 */
   const [page, setPage] = useState<"files" | "links" | "trash">("files");
@@ -210,6 +219,7 @@ export function MainScreen() {
     onDownload: (e) => ops.download.mutate(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
     onRename: readOnly ? undefined : (e) => setRenamingPath(e.path),
     onShare: (e) => setSharing(e),
+    onNearby: isTauri() ? sendNearby : undefined,
     onDelete: readOnly ? undefined : (e) => setDeleting(selected.has(e.path) && selectedEntries.length > 1 ? selectedEntries : [e]),
   };
 
@@ -310,6 +320,7 @@ export function MainScreen() {
       upload: () => dropRef.current?.open(),
       refresh: () => void qc.invalidateQueries({ queryKey: ["dir"] }),
       settings: () => setSettingsOpen(true),
+      nearby: () => setNearbySend({ kind: "local" }),
       logout,
     };
     const off = import("@tauri-apps/api/event").then(({ listen }) => listen<string>("tray", (e) => actions[e.payload]?.()));
@@ -349,6 +360,7 @@ export function MainScreen() {
           settings: () => setSettingsOpen(true),
           trash: openTrash,
           shareLinks: openLinks,
+          nearby: isTauri() ? () => sendNearby() : undefined,
         }}
         crumbs={page === "links" ? [{ label: "공유 링크", path: loc.path }] : page === "trash" ? [{ label: `${lib?.name ?? ""} 휴지통`, path: loc.path }] : crumbs}
         onNavigate={(path) => setLoc({ ...loc, path })}
@@ -461,6 +473,7 @@ export function MainScreen() {
           {lastMove && <MoveNotice op={lastMove} dstName={dirName(lastMove.dstDir)} onUndo={undoMove} onClose={closeMoveNotice} />}
           <DownloadPanel />
           <UploadPanel />
+          <NearbyPanel />
         </div>
       </div>
 
@@ -472,6 +485,7 @@ export function MainScreen() {
       />
 
       {loc.libId && <ShareDialog libId={loc.libId} entry={sharing} onClose={() => setSharing(null)} />}
+      <SendDialog source={nearbySend} onClose={() => setNearbySend(null)} />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <OverwriteDialog count={pending?.conflicts.length ?? 0} onChoice={onOverwriteChoice} />
       <DeleteDialog

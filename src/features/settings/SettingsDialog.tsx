@@ -246,6 +246,11 @@ function GeneralPage() {
           </span>
         </Row>
       </Section>
+      <Section title="근처로 보내기">
+        <Row title="근처에서 나를 찾을 수 있게" desc={app ? "같은 네트워크에서 같은 서버에 로그인한 사람에게 보이고, 서로 파일을 바로 주고받습니다" : "설치된 앱에서만 쓸 수 있습니다"}>
+          <Checkbox aria-label="근처에서 나를 찾을 수 있게" checked={prefs.nearbyVisible} disabled={!app} onCheckedChange={(v) => setPrefs({ nearbyVisible: !!v })} />
+        </Row>
+      </Section>
       <Section title="보기">
         <Row title="이미지 썸네일 표시" desc="아이콘 보기와 세부 정보 창에 적용됩니다. 끄면 파일 아이콘으로 보입니다">
           <Checkbox aria-label="이미지 썸네일 표시" checked={thumbs} onCheckedChange={(v) => setThumbs(!!v)} />

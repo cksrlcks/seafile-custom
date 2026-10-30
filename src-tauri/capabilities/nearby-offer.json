@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "nearby-offer",
+  "description": "근처로 보내기 받기 요청 팝업",
+  "windows": ["nearby-offer"],
+  "permissions": ["core:default"]
+}

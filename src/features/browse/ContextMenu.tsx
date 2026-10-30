@@ -1,4 +1,4 @@
-import { IconDownload, IconLink, IconPencil, IconTrash } from "@tabler/icons-react";
+import { IconDownload, IconLink, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { ContextMenu as Root, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Entry } from "@/storage/StorageProvider";
@@ -9,6 +9,8 @@ export interface EntryMenuActions {
   /** 읽기 전용 저장소면 없음(메뉴 항목이 꺼진다) */
   onRename?(entry: Entry): void;
   onShare?(entry: Entry): void;
+  /** 근처로 보내기. 설치된 앱에서만 */
+  onNearby?(entry: Entry): void;
   onDelete?(entry: Entry): void;
 }
 
@@ -48,6 +50,11 @@ export function EntryContextMenu({ entry, actions, children, asRow, className, o
         <ContextMenuItem disabled={!actions.onShare} onClick={() => actions.onShare?.(entry)} className="text-sm">
           <IconLink className="size-4" /> 공유 링크
         </ContextMenuItem>
+        {entry.type === "file" && actions.onNearby && (
+          <ContextMenuItem onClick={() => actions.onNearby?.(entry)} className="text-sm">
+            <IconSend className="size-4" /> 근처로 보내기…
+          </ContextMenuItem>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" disabled={!actions.onDelete} onClick={() => actions.onDelete?.(entry)} className="text-sm">
           <IconTrash className="size-4" /> 삭제

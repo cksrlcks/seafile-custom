@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { MainScreen } from "@/features/browse/MainScreen";
 import { McpBridge, McpToolProvider } from "@/features/mcp/McpBridge";
+import { NearbyRoot } from "@/features/nearby/NearbyRoot";
 import { UploadQueueRoot } from "@/features/upload/useUploadQueue";
 import { StorageError } from "@/storage/StorageProvider";
 import { StorageRoot, useSession } from "@/storage/StorageContext";
@@ -30,6 +31,7 @@ function Gate() {
   return <QueryClientProvider client={client}>{session.token ? (
         <UploadQueueRoot>
           <McpToolProvider />
+          <NearbyRoot />
           <MainScreen />
         </UploadQueueRoot>
       ) : (
