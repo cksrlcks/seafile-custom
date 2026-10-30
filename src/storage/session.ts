@@ -17,7 +17,9 @@ interface Stores {
 
 const KEY = "seadrive.session";
 const PREFS_KEY = "seadrive.loginPrefs";
-const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "http://192.168.1.240" }, token: null };
+const DEFAULT: Session = { connection: { kind: "seafile", baseUrl: "https://uxis.heavybear-lab.net" }, token: null };
+/** 같은 서버가 https 주소로 옮겨 갔다. 저장된 예전 주소는 새 주소로 읽는다(토큰은 같은 서버라 그대로 쓴다) */
+const MOVED: Record<string, string> = { "http://192.168.1.240": DEFAULT.connection.baseUrl };
 const defaultStores = (): Stores => ({ local: localStorage, session: sessionStorage });
 
 /** 입력한 서버 주소로 Connection을 만든다. "mock"은 개발용 인메모리 백엔드. */
@@ -39,7 +41,8 @@ export function loadSession(stores: Stores = defaultStores()): Session {
   const local = parse(stores.local.getItem(KEY));
   const sess = parse(stores.session.getItem(KEY));
   const connection = local?.connection?.baseUrl ? local.connection : sess?.connection?.baseUrl ? sess.connection : DEFAULT.connection;
-  return { connection, token: local?.token ?? sess?.token ?? null };
+  const moved = MOVED[connection.baseUrl.toLowerCase()];
+  return { connection: moved ? { ...connection, baseUrl: moved } : connection, token: local?.token ?? sess?.token ?? null };
 }
 
 export function saveSession(s: Session, opts: { persistent?: boolean } = {}, stores: Stores = defaultStores()): void {

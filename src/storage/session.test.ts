@@ -18,9 +18,15 @@ function memStorage(): Storage {
 describe("session", () => {
   it("loadSession returns default when empty", () => {
     expect(loadSession({ local: memStorage(), session: memStorage() })).toEqual({
-      connection: { kind: "seafile", baseUrl: "http://192.168.1.240" },
+      connection: { kind: "seafile", baseUrl: "https://uxis.heavybear-lab.net" },
       token: null,
     });
+  });
+
+  it("moves the old http address to the new https address and keeps the token", () => {
+    const s = { local: memStorage(), session: memStorage() };
+    saveSession({ connection: { kind: "seafile", baseUrl: "http://192.168.1.240" }, token: "t" }, {}, s);
+    expect(loadSession(s)).toEqual({ connection: { kind: "seafile", baseUrl: "https://uxis.heavybear-lab.net" }, token: "t" });
   });
 
   it("saveSession then loadSession round-trips", () => {
