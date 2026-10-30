@@ -13,11 +13,11 @@ export interface DeviceInfo {
 
 const KEY = "seadrive.deviceId";
 
-/** 설치마다 한 번 만드는 무작위 id(32자리 hex) */
+/** 설치마다 한 번 만드는 무작위 id. 서버가 데스크톱 기기 id는 40자(hex)만 받는다(아니면 400 invalid device id) */
 export function deviceId(local: Storage = localStorage): string {
   const saved = local.getItem(KEY);
-  if (saved && /^[0-9a-f]{32}$/.test(saved)) return saved;
-  const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  if (saved && /^[0-9a-f]{40}$/.test(saved)) return saved;
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), (b) => b.toString(16).padStart(2, "0")).join("");
   local.setItem(KEY, id);
   return id;
 }
